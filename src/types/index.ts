@@ -27,6 +27,29 @@ export type Customer = {
     commercialRegister?: string;
 };
 
+export type UserRole = 'admin' | 'manager' | 'cashier';
+export type UserStatus = 'active' | 'inactive';
+
+export type User = {
+    id: string;
+    username: string;
+    name: string;
+    role: UserRole;
+    password?: string;
+    branch_id: string;
+    status: UserStatus;
+    created_at?: string;
+};
+
+export type Branch = {
+    id: string;
+    name: string;
+    location: string;
+    phone: string;
+    is_active: boolean;
+    created_at?: string;
+};
+
 export type InvoiceStatus = 'completed' | 'pending' | 'cancelled';
 export type PaymentMethod = 'cash' | 'card' | 'credit' | 'split';
 

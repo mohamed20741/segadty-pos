@@ -20,6 +20,7 @@ const menuItems = [
     { href: "/pos", label: "نقطة البيع", icon: ShoppingCart },
     { href: "/inventory", label: "المخزون", icon: Package },
     { href: "/reports", label: "التقارير", icon: BarChart3 },
+    { href: "/branches", label: "الفروع", icon: Store },
     { href: "/users", label: "المستخدمين", icon: Users },
     { href: "/admin/migrate", label: "نقل البيانات", icon: Database },
     { href: "/settings", label: "الإعدادات", icon: Settings },

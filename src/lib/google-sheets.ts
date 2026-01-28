@@ -1,5 +1,5 @@
 
-import { Product } from "@/types";
+import { Product, User, Branch } from "@/types";
 
 const SHEET_URL = process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL;
 
@@ -58,5 +58,73 @@ export async function createOrderInSheet(orderData: any) {
     } catch (error) {
         console.error("Failed to create order:", error);
         return { status: 'error', message: 'Network error' };
+    }
+}
+
+/**
+ * جلب جميع المستخدمين
+ */
+export async function getUsersFromSheet(): Promise<User[] | null> {
+    if (!SHEET_URL) return null;
+    try {
+        const response = await fetch(`${SHEET_URL}?action=getUsers`);
+        const json = await response.json();
+        if (json.status === 'success' && json.data) {
+            return json.data;
+        }
+    } catch (error) {
+        console.error("Failed to fetch users:", error);
+    }
+    return null;
+}
+
+/**
+ * جلب جميع الفروع
+ */
+export async function getBranchesFromSheet(): Promise<Branch[] | null> {
+    if (!SHEET_URL) return null;
+    try {
+        const response = await fetch(`${SHEET_URL}?action=getBranches`);
+        const json = await response.json();
+        if (json.status === 'success' && json.data) {
+            return json.data;
+        }
+    } catch (error) {
+        console.error("Failed to fetch branches:", error);
+    }
+    return null;
+}
+
+/**
+ * إضافة مستخدم جديد
+ */
+export async function addUserToSheet(userData: Partial<User>) {
+    if (!SHEET_URL) return { status: 'error' };
+    try {
+        const response = await fetch(SHEET_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({ action: 'addUser', payload: userData })
+        });
+        return { status: 'success' };
+    } catch (error) {
+        return { status: 'error' };
+    }
+}
+
+/**
+ * إضافة فرع جديد
+ */
+export async function addBranchToSheet(branchData: Partial<Branch>) {
+    if (!SHEET_URL) return { status: 'error' };
+    try {
+        const response = await fetch(SHEET_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({ action: 'addBranch', payload: branchData })
+        });
+        return { status: 'success' };
+    } catch (error) {
+        return { status: 'error' };
     }
 }

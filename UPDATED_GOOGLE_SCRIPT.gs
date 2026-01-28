@@ -8,14 +8,18 @@ const SHEETS = {
   PRODUCTS: 'products',
   CUSTOMERS: 'customers',
   ORDERS: 'orders',
-  ORDER_ITEMS: 'order_items'
+  ORDER_ITEMS: 'order_items',
+  USERS: 'users',
+  BRANCHES: 'branches'
 };
 
 const HEADERS = {
   [SHEETS.PRODUCTS]: ['id', 'name', 'category', 'cost_price', 'selling_price', 'stock', 'min_quantity', 'image', 'created_at'],
   [SHEETS.CUSTOMERS]: ['id', 'name', 'phone', 'city', 'type', 'created_at'],
   [SHEETS.ORDERS]: ['id', 'invoice_number', 'customer_id', 'total_amount', 'status', 'created_at'],
-  [SHEETS.ORDER_ITEMS]: ['id', 'order_id', 'product_id', 'quantity', 'unit_price', 'subtotal']
+  [SHEETS.ORDER_ITEMS]: ['id', 'order_id', 'product_id', 'quantity', 'unit_price', 'subtotal'],
+  [SHEETS.USERS]: ['id', 'username', 'name', 'role', 'password', 'branch_id', 'status', 'created_at'],
+  [SHEETS.BRANCHES]: ['id', 'name', 'location', 'phone', 'is_active', 'created_at']
 };
 
 // --- دالة الإعداد (Setup) ---
@@ -59,6 +63,10 @@ function doGet(e) {
       return getTableData(SHEETS.PRODUCTS);
     case 'getCustomers':
       return getTableData(SHEETS.CUSTOMERS);
+    case 'getUsers':
+      return getTableData(SHEETS.USERS);
+    case 'getBranches':
+      return getTableData(SHEETS.BRANCHES);
     case 'getOrders':
       return getTableData(SHEETS.ORDERS);
     case 'setup':
@@ -83,6 +91,10 @@ function doPost(e) {
         return createOrderTransaction(postData.payload);
       case 'addProduct':
         return addRow(SHEETS.PRODUCTS, postData.payload);
+      case 'addUser':
+        return addRow(SHEETS.USERS, postData.payload);
+      case 'addBranch':
+        return addRow(SHEETS.BRANCHES, postData.payload);
       case 'updateStock':
         return updateProductStock(postData.payload);
       default:
