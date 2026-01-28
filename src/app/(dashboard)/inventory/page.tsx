@@ -25,7 +25,8 @@ import {
     getProductsFromSheet,
     addProductToSheet,
     updateProductInSheet,
-    bulkAddProductsToSheet
+    bulkAddProductsToSheet,
+    deleteProductFromSheet
 } from "@/lib/google-sheets";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +51,22 @@ export default function InventoryPage() {
         const data = await getProductsFromSheet();
         if (data) setProducts(data);
         setIsLoading(false);
+    };
+
+    const handleDeleteProduct = async (id: string, name: string) => {
+        if (!confirm(`هل أنت متأكد من حذف المنتج "${name}"؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+
+        setIsSaving(true);
+        try {
+            await deleteProductFromSheet(id);
+            await fetchProducts();
+            alert("تم حذف المنتج بنجاح");
+        } catch (error) {
+            console.error("Delete failed:", error);
+            alert("فشل حذف المنتج");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const categories = ["all", ...Array.from(new Set(products.map(p => p.category)))];
@@ -311,7 +328,10 @@ export default function InventoryPage() {
                                                             >
                                                                 <Edit className="w-5 h-5" />
                                                             </button>
-                                                            <button className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all">
+                                                            <button
+                                                                onClick={() => handleDeleteProduct(p.id, p.name)}
+                                                                className="p-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
+                                                            >
                                                                 <Trash className="w-5 h-5" />
                                                             </button>
                                                         </div>

@@ -1,7 +1,7 @@
 
 import { Product, User, Branch } from "@/types";
 
-const SHEET_URL = process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL;
+export const SHEET_URL = process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL;
 
 /**
  * جلب جميع المنتجات من الشيت
@@ -177,15 +177,38 @@ export async function addProductToSheet(productData: Partial<Product>) {
 export async function updateProductInSheet(productData: Partial<Product>) {
     if (!SHEET_URL) return { status: 'error' };
     try {
+        const payload: any = { ...productData };
+        // Mapping quantity back to stock only if it's provided
+        if (productData.quantity !== undefined) {
+            payload.stock = productData.quantity;
+        }
+
         await fetch(SHEET_URL, {
             method: 'POST',
             mode: 'no-cors',
             body: JSON.stringify({
                 action: 'updateProduct',
-                payload: {
-                    ...productData,
-                    stock: productData.quantity, // Mapping quantity back to stock for Sheet
-                }
+                payload: payload
+            })
+        });
+        return { status: 'success' };
+    } catch (error) {
+        return { status: 'error' };
+    }
+}
+
+/**
+ * حذف منتج
+ */
+export async function deleteProductFromSheet(id: string) {
+    if (!SHEET_URL) return { status: 'error' };
+    try {
+        await fetch(SHEET_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: 'deleteProduct',
+                payload: { id }
             })
         });
         return { status: 'success' };
@@ -211,6 +234,25 @@ export async function bulkAddProductsToSheet(products: Partial<Product>[]) {
         return { status: 'success' };
     } catch (error) {
         return { status: 'error' };
+    }
+}
+
+/**
+ * تسجيل لوق (Log) مباشر في الشيت
+ */
+export async function logToSheet(action: string, entity: string, entityId: string, details: string, status: 'success' | 'error') {
+    if (!SHEET_URL) return;
+    try {
+        await fetch(SHEET_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: 'log',
+                payload: { action, entity, entity_id: entityId, details, status }
+            })
+        });
+    } catch (e) {
+        console.error("Failed to log to sheet:", e);
     }
 }
 

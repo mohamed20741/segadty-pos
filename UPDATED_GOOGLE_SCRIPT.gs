@@ -10,7 +10,8 @@ const SHEETS = {
   ORDERS: 'orders',
   ORDER_ITEMS: 'order_items',
   USERS: 'users',
-  BRANCHES: 'branches'
+  BRANCHES: 'branches',
+  LOGS: 'logs'
 };
 
 const HEADERS = {
@@ -19,7 +20,8 @@ const HEADERS = {
   [SHEETS.ORDERS]: ['id', 'invoice_number', 'customer_id', 'total_amount', 'status', 'created_at'],
   [SHEETS.ORDER_ITEMS]: ['id', 'order_id', 'product_id', 'quantity', 'unit_price', 'subtotal'],
   [SHEETS.USERS]: ['id', 'username', 'name', 'role', 'password', 'branch_id', 'status', 'created_at'],
-  [SHEETS.BRANCHES]: ['id', 'name', 'location', 'phone', 'is_active', 'created_at']
+  [SHEETS.BRANCHES]: ['id', 'name', 'location', 'phone', 'is_active', 'created_at'],
+  [SHEETS.LOGS]: ['timestamp', 'action', 'entity', 'entity_id', 'details', 'status']
 };
 
 // --- دالة الإعداد (Setup) ---
@@ -56,53 +58,82 @@ function setupDatabase() {
 function doGet(e) {
   const action = e.parameter.action;
   const id = e.parameter.id;
+  let response;
   
-  // توجيه الطلبات
   switch(action) {
     case 'getProducts':
-      return getTableData(SHEETS.PRODUCTS);
+      response = getTableData(SHEETS.PRODUCTS);
+      break;
     case 'getCustomers':
-      return getTableData(SHEETS.CUSTOMERS);
+      response = getTableData(SHEETS.CUSTOMERS);
+      break;
     case 'getUsers':
-      return getTableData(SHEETS.USERS);
+      response = getTableData(SHEETS.USERS);
+      break;
     case 'getBranches':
-      return getTableData(SHEETS.BRANCHES);
+      response = getTableData(SHEETS.BRANCHES);
+      break;
     case 'getOrders':
-      return getTableData(SHEETS.ORDERS);
+      response = getTableData(SHEETS.ORDERS);
+      break;
+    case 'getLogs':
+      response = getTableData(SHEETS.LOGS);
+      break;
     case 'setup':
-      return setupDatabase();
+      response = setupDatabase();
+      break;
     default:
-      return createJSONOutput({ status: 'error', message: 'Invalid action' });
+      response = { status: 'error', message: 'Invalid action' };
   }
+  return createJSONOutput(response);
 }
 
 function doPost(e) {
   const lock = LockService.getScriptLock();
-  
   try {
-    // محاولة حجز العملية لمدة 10 ثواني لمنع التضارب
     lock.waitLock(10000); 
-    
     const postData = JSON.parse(e.postData.contents);
     const action = postData.action;
-    
+    let response;
+
     switch(action) {
       case 'createOrder':
-        return createOrderTransaction(postData.payload);
+        response = createOrderTransaction(postData.payload);
+        logActivity('CREATE', 'ORDER', response.orderId || 'N/A', JSON.stringify(postData.payload), response.status);
+        break;
       case 'addProduct':
-        return addRow(SHEETS.PRODUCTS, postData.payload);
+        response = addRow(SHEETS.PRODUCTS, postData.payload);
+        logActivity('ADD', 'PRODUCT', response.id || 'N/A', JSON.stringify(postData.payload), response.status);
+        break;
       case 'updateProduct':
-        return updateProduct(postData.payload);
+        response = updateProduct(postData.payload);
+        logActivity('UPDATE', 'PRODUCT', postData.payload.id || 'N/A', JSON.stringify(postData.payload), response.status);
+        break;
+      case 'deleteProduct':
+        response = deleteRow(SHEETS.PRODUCTS, postData.payload.id);
+        logActivity('DELETE', 'PRODUCT', postData.payload.id || 'N/A', 'Deleted by user', response.status);
+        break;
       case 'bulkAddProducts':
-        return bulkAddProducts(postData.payload);
+        response = bulkAddProducts(postData.payload);
+        logActivity('BULK_ADD', 'PRODUCT', 'MULTIPLE', `Items: ${postData.payload.length}`, response.status);
+        break;
       case 'addUser':
-        return addRow(SHEETS.USERS, postData.payload);
+        response = addRow(SHEETS.USERS, postData.payload);
+        break;
       case 'addBranch':
-        return addRow(SHEETS.BRANCHES, postData.payload);
+        response = addRow(SHEETS.BRANCHES, postData.payload);
+        break;
+      case 'log':
+        logActivity(postData.payload.action, postData.payload.entity, postData.payload.entity_id, postData.payload.details, postData.payload.status);
+        response = { status: 'success' };
+        break;
       default:
-        return createJSONOutput({ status: 'error', message: 'Invalid action' });
+        logActivity('UNKNOWN', 'ACTION', 'N/A', action, 'error');
+        response = { status: 'error', message: 'Invalid action' };
     }
+    return createJSONOutput(response);
   } catch (error) {
+    logActivity('ERROR', 'SYSTEM', 'N/A', error.toString(), 'error');
     return createJSONOutput({ status: 'error', message: error.toString() });
   } finally {
     lock.releaseLock();
@@ -113,7 +144,7 @@ function doPost(e) {
 
 function getTableData(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) return createJSONOutput({ status: 'error', message: `Sheet ${sheetName} not found` });
+  if (!sheet) return { status: 'error', message: `Sheet ${sheetName} not found` };
   
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
@@ -125,19 +156,19 @@ function getTableData(sheetName) {
     return obj;
   });
   
-  return createJSONOutput({ status: 'success', data: result });
+  return { status: 'success', data: result };
 }
 
 function addRow(sheetName, data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) return createJSONOutput({ status: 'error', message: `Sheet ${sheetName} not found` });
+  if (!sheet) return { status: 'error', message: `Sheet ${sheetName} not found` };
   
   // منع التكرار للمنتجات بناءً على ID
   if (sheetName === SHEETS.PRODUCTS && data.id) {
     const existingData = sheet.getDataRange().getValues();
     for (let i = 1; i < existingData.length; i++) {
       if (String(existingData[i][0]) === String(data.id)) {
-        return createJSONOutput({ status: 'success', message: 'Product already exists', id: data.id });
+        return { status: 'success', message: 'Product already exists', id: data.id };
       }
     }
   }
@@ -150,7 +181,7 @@ function addRow(sheetName, data) {
   });
   
   sheet.appendRow(newRow);
-  return createJSONOutput({ status: 'success', message: 'Row added', id: newRow[0] });
+  return { status: 'success', message: 'Row added', id: newRow[0] };
 }
 
 // دالة معقدة لإنشاء الطلب وتحديث المخزون (Transaction)
@@ -210,12 +241,12 @@ function createOrderTransaction(payload) {
     }
   });
   
-  return createJSONOutput({ 
+  return { 
     status: 'success', 
     message: 'Order created and stock updated', 
     orderId: orderId,
     invoiceNumber: invoiceNumber
-  });
+  };
 }
 
 function updateProduct(data) {
@@ -232,10 +263,10 @@ function updateProduct(data) {
           sheet.getRange(i + 1, colIndex + 1).setValue(data[h]);
         }
       });
-      return createJSONOutput({ status: 'success', message: 'Product updated' });
+      return { status: 'success', message: 'Product updated' };
     }
   }
-  return createJSONOutput({ status: 'error', message: 'Product not found' });
+  return { status: 'error', message: 'Product not found' };
 }
 
 function bulkAddProducts(payload) {
@@ -277,7 +308,35 @@ function bulkAddProducts(payload) {
     }
   });
   
-  return createJSONOutput({ status: 'success', message: 'Bulk products processed (Added/Updated)' });
+  return { status: 'success', message: 'Bulk products processed (Added/Updated)' };
+}
+
+function logActivity(action, entity, entityId, details, status) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(SHEETS.LOGS);
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEETS.LOGS);
+      sheet.appendRow(HEADERS[SHEETS.LOGS]);
+    }
+    sheet.appendRow([new Date(), action, entity, entityId, details, status]);
+  } catch (e) {
+    console.error("Logging failed: " + e.toString());
+  }
+}
+
+function deleteRow(sheetName, id) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+  const data = sheet.getDataRange().getValues();
+  
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return { status: 'success', message: 'Row deleted' };
+    }
+  }
+  return { status: 'error', message: 'Row not found' };
 }
 
 // --- Helper Functions ---
