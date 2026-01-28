@@ -99,6 +99,50 @@ export async function logToSheet(action: string, entity: string, entityId: strin
 }
 
 /**
+ * جلب جميع الفروع
+ */
+export async function getBranchesFromSheet(): Promise<Branch[] | null> {
+    if (!SHEET_URL) return null;
+    try {
+        const res = await fetch(`${SHEET_URL}?action=getBranches`);
+        const json = await res.json();
+        return json.status === 'success' ? json.data : null;
+    } catch (error) {
+        console.error("Failed to fetch branches:", error);
+        return null;
+    }
+}
+
+/**
+ * إضافة فرع جديد
+ */
+export async function addBranchToSheet(branchData: Partial<Branch>) {
+    return postToSheet('addBranch', branchData);
+}
+
+/**
+ * جلب جميع المستخدمين
+ */
+export async function getUsersFromSheet(): Promise<User[] | null> {
+    if (!SHEET_URL) return null;
+    try {
+        const res = await fetch(`${SHEET_URL}?action=getUsers`);
+        const json = await res.json();
+        return json.status === 'success' ? json.data : null;
+    } catch (error) {
+        console.error("Failed to fetch users:", error);
+        return null;
+    }
+}
+
+/**
+ * إضافة مستخدم جديد
+ */
+export async function addUserToSheet(userData: Partial<User>) {
+    return postToSheet('addUser', userData);
+}
+
+/**
  * اختبار الاتصال بقاعدة البيانات
  */
 export async function testConnection(): Promise<boolean> {

@@ -99,6 +99,14 @@ function doPost(e) {
         response = bulkAddProducts(postData.payload);
         logActivity('BULK_ADD', 'PRODUCT', 'MULTIPLE', `Items: ${postData.payload.length}`, response.status);
         break;
+      case 'addUser':
+        response = addRow(SHEETS.USERS, postData.payload);
+        logActivity('ADD', 'USER', response.id || 'N/A', postData.payload.username, response.status);
+        break;
+      case 'addBranch':
+        response = addRow(SHEETS.BRANCHES, postData.payload);
+        logActivity('ADD', 'BRANCH', response.id || 'N/A', postData.payload.name, response.status);
+        break;
       case 'log':
         logActivity(postData.payload.action, postData.payload.entity, postData.payload.entity_id, postData.payload.details, postData.payload.status);
         response = { status: 'success' };
