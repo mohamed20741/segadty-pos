@@ -28,6 +28,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     });
 
     const [lastInvoiceNumber, setLastInvoiceNumber] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
 
     if (!isOpen) return null;
 
@@ -41,7 +42,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         setIsProcessing(true);
 
         // Generate Mock Invoice Number
-        const invoiceNum = `HAM-2026-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+        const invoiceNum = `INV-${Date.now().toString().slice(-6)}`;
 
         try {
             // Import the sheet function
@@ -62,7 +63,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     quantity: item.cartQuantity,
                     price: item.selling_price
                 })),
+                subtotal: subtotal,
+                tax: tax,
                 total: total,
+                payment_method: paymentMethod,
                 invoiceNumber: invoiceNum
             };
 
@@ -189,10 +193,45 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                                 </div>
                             )}
 
-                            <div className="bg-gray-50 p-4 rounded-xl space-y-2 border border-dashed border-gray-200">
-                                <div className="flex justify-between font-bold text-gray-800">
-                                    <span>إجمالي الفاتورة المطلوب</span>
-                                    <span className="text-primary text-xl">{total.toLocaleString()} ر.س</span>
+                            <div className="space-y-4">
+                                <label className="text-sm font-bold text-gray-700">طريقة الدفع</label>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethod("cash")}
+                                        className={`flex items-center justify-center gap-3 h-14 rounded-2xl border-2 transition-all ${paymentMethod === 'cash' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                    >
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'cash' ? 'border-primary' : 'border-gray-300'}`}>
+                                            {paymentMethod === 'cash' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                                        </div>
+                                        <span className="font-bold">نقداً (Cash)</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentMethod("card")}
+                                        className={`flex items-center justify-center gap-3 h-14 rounded-2xl border-2 transition-all ${paymentMethod === 'card' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                    >
+                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${paymentMethod === 'card' ? 'border-primary' : 'border-gray-300'}`}>
+                                            {paymentMethod === 'card' && <div className="w-2.5 h-2.5 bg-primary rounded-full" />}
+                                        </div>
+                                        <span className="font-bold">شبكة (Card)</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-gray-50 p-6 rounded-2xl space-y-3 border border-gray-100 shadow-inner">
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <span>المجموع الفرعي</span>
+                                    <span>{subtotal.toLocaleString()} ر.س</span>
+                                </div>
+                                <div className="flex justify-between text-sm text-gray-500">
+                                    <span>ضريبة القيمة المضافة (15%)</span>
+                                    <span>{tax.toLocaleString()} ر.س</span>
+                                </div>
+                                <div className="h-px bg-gray-200 my-2"></div>
+                                <div className="flex justify-between font-bold text-gray-800 text-xl">
+                                    <span>الإجمالي النهائي</span>
+                                    <span className="text-primary">{total.toLocaleString()} ر.س</span>
                                 </div>
                             </div>
 

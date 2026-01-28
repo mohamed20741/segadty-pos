@@ -147,3 +147,18 @@ export async function addBranchToSheet(branchData: Partial<Branch>) {
         return { status: 'error' };
     }
 }
+
+/**
+ * اختبار الاتصال بقاعدة البيانات
+ */
+export async function testConnection(): Promise<boolean> {
+    if (!SHEET_URL) return false;
+    try {
+        const response = await fetch(`${SHEET_URL}?action=getProducts`);
+        const json = await response.json();
+        return json.status === 'success';
+    } catch (error) {
+        console.error("Connection test failed:", error);
+        return false;
+    }
+}

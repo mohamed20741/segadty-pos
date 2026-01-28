@@ -41,12 +41,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setCart((prev) => {
             const existing = prev.find((item) => item.id === product.id);
             if (existing) {
+                // Check if we have enough stock
+                if (existing.cartQuantity >= product.quantity) {
+                    alert(`عذراً، المخزون المتوفر من ${product.name} هو ${product.quantity} فقط`);
+                    return prev;
+                }
                 return prev.map((item) =>
                     item.id === product.id
                         ? { ...item, cartQuantity: item.cartQuantity + 1 }
                         : item
                 );
             }
+
+            if (product.quantity <= 0) {
+                alert(`عذراً، هذا المنتج غير متوفر في المخزون حالياً`);
+                return prev;
+            }
+
             return [...prev, { ...product, cartQuantity: 1 }];
         });
     };
@@ -60,10 +71,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             removeFromCart(productId);
             return;
         }
+
         setCart((prev) =>
-            prev.map((item) =>
-                item.id === productId ? { ...item, cartQuantity: quantity } : item
-            )
+            prev.map((item) => {
+                if (item.id === productId) {
+                    if (quantity > item.quantity) {
+                        alert(`عذراً، المخزون المتوفر هو ${item.quantity} فقط`);
+                        return item;
+                    }
+                    return { ...item, cartQuantity: quantity };
+                }
+                return item;
+            })
         );
     };
 

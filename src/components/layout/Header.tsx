@@ -1,6 +1,62 @@
 "use client";
 
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, Database, CheckCircle, XCircle, Loader2, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { testConnection } from "@/lib/google-sheets";
+import { cn } from "@/lib/utils";
+
+function DbStatusButton() {
+    const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+
+    const handleCheck = async () => {
+        setStatus("loading");
+        const isOk = await testConnection();
+        setStatus(isOk ? "success" : "error");
+
+        // Reset to idle after some time
+        setTimeout(() => setStatus("idle"), 3000);
+    };
+
+    return (
+        <button
+            onClick={handleCheck}
+            disabled={status === "loading"}
+            className={cn(
+                "flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 font-bold text-xs",
+                status === "idle" && "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100",
+                status === "loading" && "bg-blue-50 text-blue-600 border-blue-200",
+                status === "success" && "bg-green-50 text-green-600 border-green-200 shadow-[0_0_10px_rgba(34,197,94,0.2)]",
+                status === "error" && "bg-red-50 text-red-600 border-red-200 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+            )}
+        >
+            {status === "idle" && (
+                <>
+                    <Database className="w-3.5 h-3.5" />
+                    <span>اتصال السحابة</span>
+                    <RefreshCw className="w-3 h-3 text-gray-400 group-hover:rotate-180 transition-transform" />
+                </>
+            )}
+            {status === "loading" && (
+                <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>جاري التوصيل...</span>
+                </>
+            )}
+            {status === "success" && (
+                <>
+                    <CheckCircle className="w-3.5 h-3.5" />
+                    <span>متصل بنجاح</span>
+                </>
+            )}
+            {status === "error" && (
+                <>
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span>خطأ في الاتصال</span>
+                </>
+            )}
+        </button>
+    );
+}
 
 export function Header() {
     return (
@@ -10,6 +66,8 @@ export function Header() {
                     <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
                     <h2 className="text-sm font-bold text-primary">فرع الحمرا</h2>
                 </div>
+
+                <DbStatusButton />
 
                 <div className="hidden lg:block w-96 relative group">
                     <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
