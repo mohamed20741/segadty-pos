@@ -149,6 +149,29 @@ export async function addBranchToSheet(branchData: Partial<Branch>) {
 }
 
 /**
+ * إضافة منتج جديد
+ */
+export async function addProductToSheet(productData: Partial<Product>) {
+    if (!SHEET_URL) return { status: 'error' };
+    try {
+        await fetch(SHEET_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: 'addProduct',
+                payload: {
+                    ...productData,
+                    stock: productData.quantity, // Mapping quantity to stock column
+                }
+            })
+        });
+        return { status: 'success' };
+    } catch (error) {
+        return { status: 'error' };
+    }
+}
+
+/**
  * اختبار الاتصال بقاعدة البيانات
  */
 export async function testConnection(): Promise<boolean> {

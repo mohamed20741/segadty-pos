@@ -1,25 +1,20 @@
-
-import { db } from "./firebase";
-import { collection, doc, writeBatch } from "firebase/firestore";
+import { addProductToSheet } from "./google-sheets";
 import { mockProducts } from "./data";
 
 export async function seedDatabase() {
-    if (!db) throw new Error("Database not initialized. Check your .env.local configuration.");
+    console.log("Starting database seeding to Google Sheets...");
 
-    const batch = writeBatch(db);
-
-    // Seed Products
-    mockProducts.forEach((product) => {
-        const productRef = doc(collection(db, "products"), product.id);
-        batch.set(productRef, product);
-    });
-
-    try {
-        await batch.commit();
-        console.log("Database seeded successfully!");
-        return true;
-    } catch (error) {
-        console.error("Error seeding database:", error);
-        throw error;
+    // Seed Products one by one (Google Sheets POST is limited, but this is a one-time thing)
+    // Using Promise.all with a small delay or Map might be better, but simple loop for now
+    for (const product of mockProducts) {
+        try {
+            await addProductToSheet(product);
+            console.log(`Added product: ${product.name}`);
+        } catch (error) {
+            console.error(`Failed to add product: ${product.name}`, error);
+        }
     }
+
+    console.log("Database seeding attempt completed!");
+    return true;
 }
