@@ -59,8 +59,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     id: item.id,
                     product_id: item.id,
                     name: item.name,
-                    quantity: item.quantity,
-                    price: item.price
+                    quantity: item.cartQuantity,
+                    price: item.selling_price
                 })),
                 total: total,
                 invoiceNumber: invoiceNum
