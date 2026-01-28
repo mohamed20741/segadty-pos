@@ -91,12 +91,14 @@ function doPost(e) {
         return createOrderTransaction(postData.payload);
       case 'addProduct':
         return addRow(SHEETS.PRODUCTS, postData.payload);
+      case 'updateProduct':
+        return updateProduct(postData.payload);
+      case 'bulkAddProducts':
+        return bulkAddProducts(postData.payload);
       case 'addUser':
         return addRow(SHEETS.USERS, postData.payload);
       case 'addBranch':
         return addRow(SHEETS.BRANCHES, postData.payload);
-      case 'updateStock':
-        return updateProductStock(postData.payload);
       default:
         return createJSONOutput({ status: 'error', message: 'Invalid action' });
     }
@@ -214,6 +216,45 @@ function createOrderTransaction(payload) {
     orderId: orderId,
     invoiceNumber: invoiceNumber
   });
+}
+
+function updateProduct(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.PRODUCTS);
+  const existingData = sheet.getDataRange().getValues();
+  const headers = existingData[0];
+  
+  for (let i = 1; i < existingData.length; i++) {
+    if (String(existingData[i][0]) === String(data.id)) {
+      // Find the row and update
+      headers.forEach((h, colIndex) => {
+        if (data[h] !== undefined) {
+          sheet.getRange(i + 1, colIndex + 1).setValue(data[h]);
+        }
+      });
+      return createJSONOutput({ status: 'success', message: 'Product updated' });
+    }
+  }
+  return createJSONOutput({ status: 'error', message: 'Product not found' });
+}
+
+function bulkAddProducts(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.PRODUCTS);
+  const headers = HEADERS[SHEETS.PRODUCTS];
+  
+  payload.forEach(item => {
+    const newRow = headers.map(h => {
+      if (h === 'created_at') return new Date();
+      if (h === 'id' && !item[h]) return Utilities.getUuid();
+      // Handle quantity -> stock mapping if needed
+      const val = item[h] !== undefined ? item[h] : (h === 'stock' ? (item.quantity || 0) : '');
+      return val;
+    });
+    sheet.appendRow(newRow);
+  });
+  
+  return createJSONOutput({ status: 'success', message: 'Bulk products added' });
 }
 
 // --- Helper Functions ---

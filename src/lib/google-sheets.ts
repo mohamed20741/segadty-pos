@@ -172,6 +172,49 @@ export async function addProductToSheet(productData: Partial<Product>) {
 }
 
 /**
+ * تحديث بيانات منتج
+ */
+export async function updateProductInSheet(productData: Partial<Product>) {
+    if (!SHEET_URL) return { status: 'error' };
+    try {
+        await fetch(SHEET_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: 'updateProduct',
+                payload: {
+                    ...productData,
+                    stock: productData.quantity, // Mapping quantity back to stock for Sheet
+                }
+            })
+        });
+        return { status: 'success' };
+    } catch (error) {
+        return { status: 'error' };
+    }
+}
+
+/**
+ * إضافة منتجات بالجملة (Inventory Feeding)
+ */
+export async function bulkAddProductsToSheet(products: Partial<Product>[]) {
+    if (!SHEET_URL) return { status: 'error' };
+    try {
+        await fetch(SHEET_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({
+                action: 'bulkAddProducts',
+                payload: products
+            })
+        });
+        return { status: 'success' };
+    } catch (error) {
+        return { status: 'error' };
+    }
+}
+
+/**
  * اختبار الاتصال بقاعدة البيانات
  */
 export async function testConnection(): Promise<boolean> {
