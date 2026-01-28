@@ -69,8 +69,18 @@ export async function getUsersFromSheet(): Promise<User[] | null> {
     try {
         const response = await fetch(`${SHEET_URL}?action=getUsers`);
         const json = await response.json();
-        if (json.status === 'success' && json.data) {
-            return json.data;
+        if (json.status === 'success' && json.data && Array.isArray(json.data)) {
+            return json.data
+                .filter((item: any) => item && item.id)
+                .map((item: any) => ({
+                    id: String(item.id),
+                    username: item.username || '',
+                    name: item.name || 'مستخدم بدون اسم',
+                    role: item.role || 'cashier',
+                    branch_id: item.branch_id || '',
+                    status: item.status || 'active',
+                    created_at: item.created_at
+                }));
         }
     } catch (error) {
         console.error("Failed to fetch users:", error);
@@ -86,8 +96,17 @@ export async function getBranchesFromSheet(): Promise<Branch[] | null> {
     try {
         const response = await fetch(`${SHEET_URL}?action=getBranches`);
         const json = await response.json();
-        if (json.status === 'success' && json.data) {
-            return json.data;
+        if (json.status === 'success' && json.data && Array.isArray(json.data)) {
+            return json.data
+                .filter((item: any) => item && item.id)
+                .map((item: any) => ({
+                    id: String(item.id),
+                    name: item.name || 'فرع بدون اسم',
+                    location: item.location || 'غير محدد',
+                    phone: item.phone || '',
+                    is_active: item.is_active === true || item.is_active === 'TRUE' || item.is_active === 'true',
+                    created_at: item.created_at
+                }));
         }
     } catch (error) {
         console.error("Failed to fetch branches:", error);

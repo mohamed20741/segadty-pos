@@ -10,7 +10,6 @@ import {
     Plus,
     Shield,
     UserCheck,
-    UserX,
     Search,
     Loader2,
     MoreVertical,
@@ -39,13 +38,18 @@ export default function UsersPage() {
 
     const fetchData = async () => {
         setIsLoading(true);
-        const [usersData, branchesData] = await Promise.all([
-            getUsersFromSheet(),
-            getBranchesFromSheet()
-        ]);
-        if (usersData) setUsers(usersData);
-        if (branchesData) setBranches(branchesData);
-        setIsLoading(false);
+        try {
+            const [usersData, branchesData] = await Promise.all([
+                getUsersFromSheet(),
+                getBranchesFromSheet()
+            ]);
+            if (usersData) setUsers(usersData);
+            if (branchesData) setBranches(branchesData);
+        } catch (error) {
+            console.error("Fetch error:", error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleAddUser = async (e: React.FormEvent) => {
@@ -66,13 +70,13 @@ export default function UsersPage() {
     };
 
     const filteredUsers = users.filter(user =>
-        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.username.toLowerCase().includes(searchTerm.toLowerCase())
+        (user.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+        (user.username?.toLowerCase() || "").includes(searchTerm.toLowerCase())
     );
 
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-            {/* Header section */}
+            {/* Header section with defensive checks */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
@@ -151,8 +155,10 @@ export default function UsersPage() {
                             {isLoading ? (
                                 <tr>
                                     <td colSpan={6} className="px-6 py-20 text-center">
-                                        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mr-4" />
-                                        <p className="mt-4 text-gray-500">جاري تحميل البيانات...</p>
+                                        <div className="flex flex-col items-center justify-center gap-4">
+                                            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                                            <p className="text-gray-500">جاري تحميل البيانات...</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : filteredUsers.length === 0 ? (

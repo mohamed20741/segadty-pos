@@ -13,7 +13,6 @@ import {
     Search,
     Loader2,
     MoreVertical,
-    Activity,
     CheckCircle2
 } from "lucide-react";
 
@@ -36,9 +35,14 @@ export default function BranchesPage() {
 
     const fetchData = async () => {
         setIsLoading(true);
-        const data = await getBranchesFromSheet();
-        if (data) setBranches(data);
-        setIsLoading(false);
+        try {
+            const data = await getBranchesFromSheet();
+            if (data) setBranches(data);
+        } catch (error) {
+            console.error("Fetch error:", error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleAddBranch = async (e: React.FormEvent) => {
@@ -57,8 +61,8 @@ export default function BranchesPage() {
     };
 
     const filteredBranches = branches.filter(branch =>
-        branch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        branch.location.toLowerCase().includes(searchTerm.toLowerCase())
+        (branch.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
+        (branch.location?.toLowerCase() || "").includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -132,8 +136,10 @@ export default function BranchesPage() {
                             {isLoading ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-20 text-center">
-                                        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mr-4" />
-                                        <p className="mt-4 text-gray-500">جاري تحميل البيانات...</p>
+                                        <div className="flex flex-col items-center justify-center gap-4">
+                                            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                                            <p className="text-gray-500">جاري تحميل البيانات...</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : filteredBranches.length === 0 ? (
