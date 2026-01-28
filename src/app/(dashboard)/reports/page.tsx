@@ -225,7 +225,7 @@ export default function ReportsPage() {
                             <div className="h-3 w-full bg-gray-50 rounded-full overflow-hidden">
                                 <div
                                     className="h-full bg-gradient-to-r from-primary to-[#5D4037] rounded-full transition-all duration-1000"
-                                    style={{ width: `${(data.categorySales[cat] / (totalValue || 1)) * 100}%` }} // Wait, I need totalValue or category total
+                                    style={{ width: `${(data.categorySales[cat] / (data.totalSales || 1)) * 100}%` }}
                                 ></div>
                             </div>
                         </div>

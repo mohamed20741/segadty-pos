@@ -72,9 +72,13 @@ export default function InventoryPage() {
     const categories = ["all", ...Array.from(new Set(products.map(p => p.category)))];
 
     const filteredProducts = products.filter(product => {
-        const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            product.id.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory = filterCategory === "all" || product.category === filterCategory;
+        const name = product.name || "";
+        const id = product.id || "";
+        const category = product.category || "";
+
+        const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            id.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = filterCategory === "all" || category === filterCategory;
         return matchesSearch && matchesCategory;
     });
 

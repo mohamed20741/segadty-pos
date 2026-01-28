@@ -307,7 +307,7 @@ function getReportsData() {
       orderCount: orders.length - 1,
       dailySales,
       categorySales,
-      topProducts: Object.entries(productSales).sort((a,b) => (b[1] as number)-(a[1] as number)).slice(0, 5)
+      topProducts: Object.entries(productSales).sort((a,b) => b[1] - a[1]).slice(0, 5)
     }
   };
 }

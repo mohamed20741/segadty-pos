@@ -1,6 +1,6 @@
-# الدليل الشامل: إعداد قاعدة بيانات Google Sheets الاحترافية (محدث v1.2.0)
+# الدليل الشامل: إعداد قاعدة بيانات Google Sheets الاحترافية (محدث v1.3.1)
 
-هذا الدليل يحتوي على السكربت النهائي المتوافق مع كافة ميزات النظام (المخزون، السجلات، الحذف، التحديث).
+هذا الدليل يحتوي على السكربت النهائي المتوافق مع كافة ميزات النظام (المخزون، السجلات، الحذف، التحديث، والتقارير الذكية).
 
 ## خطوة 1: إعداد ملف الشيت
 1.  افتح ملف Google Sheet جديد.
@@ -8,15 +8,14 @@
 3.  اذهب إلى **Extensions** > **Apps Script**.
 
 ## خطوة 2: الكود البرمجي
-انسخ الكود التالي بالكامل (هذا هو الكود المحدث لحل مشكلة السجلات والخطأ البرمجي):
+انسخ الكود التالي بالكامل (تم إصلاح كافة أخطاء الـ Syntax والتحقق من العلاقات):
 
 ```javascript
 /**
  * Segadty POS Backend - Professional Google Apps Script
- * v1.2.0 - تم إصلاح مشكلة السجلات والـ Headers
+ * v1.3.1 - التحسين النهائي للعلاقات والتقارير
  */
 
-// --- التكوين (Configuration) ---
 const SHEETS = {
   PRODUCTS: 'products',
   CUSTOMERS: 'customers',
@@ -37,14 +36,11 @@ const HEADERS = {
   [SHEETS.LOGS]: ['timestamp', 'action', 'entity', 'entity_id', 'details', 'status']
 };
 
-// --- دالة الإعداد (Setup) ---
 function setupDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
   Object.keys(SHEETS).forEach(key => {
     const sheetName = SHEETS[key];
     let sheet = ss.getSheetByName(sheetName);
-    
     if (!sheet) {
       sheet = ss.insertSheet(sheetName);
       sheet.getRange(1, 1, 1, HEADERS[sheetName].length)
@@ -54,21 +50,14 @@ function setupDatabase() {
       sheet.setFrozenRows(1);
     }
   });
-  
   const defaultSheet = ss.getSheetByName('Sheet1');
-  if (defaultSheet && defaultSheet.getLastRow() === 0) {
-    ss.deleteSheet(defaultSheet);
-  }
-  
-  return createJSONOutput({ status: 'success', message: 'Database setup complete. All tables (including logs) created.' });
+  if (defaultSheet && defaultSheet.getLastRow() === 0) ss.deleteSheet(defaultSheet);
+  return createJSONOutput({ status: 'success', message: 'Database setup complete.' });
 }
-
-// --- API Endpoints ---
 
 function doGet(e) {
   const action = e.parameter.action;
   let response;
-  
   switch(action) {
     case 'getProducts': response = getTableData(SHEETS.PRODUCTS); break;
     case 'getCustomers': response = getTableData(SHEETS.CUSTOMERS); break;
@@ -76,6 +65,7 @@ function doGet(e) {
     case 'getBranches': response = getTableData(SHEETS.BRANCHES); break;
     case 'getOrders': response = getTableData(SHEETS.ORDERS); break;
     case 'getLogs': response = getTableData(SHEETS.LOGS); break;
+    case 'getReportsData': response = getReportsData(); break;
     case 'setup': response = setupDatabase(); break;
     default: response = { status: 'error', message: 'Invalid action' };
   }
@@ -89,7 +79,6 @@ function doPost(e) {
     const postData = JSON.parse(e.postData.contents);
     const action = postData.action;
     let response;
-
     switch(action) {
       case 'createOrder':
         response = createOrderTransaction(postData.payload);
@@ -101,11 +90,11 @@ function doPost(e) {
         break;
       case 'updateProduct':
         response = updateProduct(postData.payload);
-        logActivity('UPDATE', 'PRODUCT', postData.payload.id || 'N/A', JSON.stringify(postData.payload), response.status);
+        logActivity('UPDATE', 'PRODUCT', String(postData.payload.id), JSON.stringify(postData.payload), response.status);
         break;
       case 'deleteProduct':
         response = deleteRow(SHEETS.PRODUCTS, postData.payload.id);
-        logActivity('DELETE', 'PRODUCT', postData.payload.id || 'N/A', 'Deleted by user', response.status);
+        logActivity('DELETE', 'PRODUCT', String(postData.payload.id), 'Deleted', response.status);
         break;
       case 'bulkAddProducts':
         response = bulkAddProducts(postData.payload);
@@ -115,8 +104,7 @@ function doPost(e) {
         logActivity(postData.payload.action, postData.payload.entity, postData.payload.entity_id, postData.payload.details, postData.payload.status);
         response = { status: 'success' };
         break;
-      default:
-        response = { status: 'error', message: 'Invalid action' };
+      default: response = { status: 'error', message: 'Invalid action' };
     }
     return createJSONOutput(response);
   } catch (error) {
@@ -126,11 +114,9 @@ function doPost(e) {
   }
 }
 
-// --- Logic Functions ---
-
 function getTableData(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) return { status: 'error', message: `Sheet ${sheetName} not found` };
+  if (!sheet) return { status: 'error', message: 'Sheet not found' };
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const result = data.slice(1).map(row => {
@@ -143,7 +129,13 @@ function getTableData(sheetName) {
 
 function addRow(sheetName, data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  if (!sheet) return { status: 'error', message: `Sheet ${sheetName} not found` };
+  if (!sheet) return { status: 'error', message: 'Sheet not found' };
+  if (sheetName === SHEETS.PRODUCTS && data.id) {
+    const vals = sheet.getDataRange().getValues();
+    for (let i = 1; i < vals.length; i++) {
+      if (String(vals[i][0]).trim().toLowerCase() === String(data.id).trim().toLowerCase()) return { status: 'success', message: 'Exists', id: data.id };
+    }
+  }
   const headers = HEADERS[sheetName];
   const newRow = headers.map(h => {
     if (h === 'created_at') return new Date();
@@ -151,49 +143,51 @@ function addRow(sheetName, data) {
     return data[h] !== undefined ? data[h] : '';
   });
   sheet.appendRow(newRow);
-  return { status: 'success', message: 'Row added', id: newRow[0] };
+  return { status: 'success', id: newRow[0] };
 }
 
 function updateProduct(data) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.PRODUCTS);
-  const existingData = sheet.getDataRange().getValues();
-  const headers = existingData[0];
-  for (let i = 1; i < existingData.length; i++) {
-    if (String(existingData[i][0]) === String(data.id)) {
-      headers.forEach((h, colIndex) => {
-        if (data[h] !== undefined) sheet.getRange(i + 1, colIndex + 1).setValue(data[h]);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const searchId = String(data.id).trim().toLowerCase();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim().toLowerCase() === searchId) {
+      headers.forEach((h, col) => {
+        if (data[h] !== undefined) sheet.getRange(i + 1, col + 1).setValue(data[h]);
       });
-      return { status: 'success', message: 'Product updated' };
+      return { status: 'success' };
     }
   }
-  return { status: 'error', message: 'Product not found' };
+  return { status: 'error', message: 'Not found' };
 }
 
 function deleteRow(sheetName, id) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(id)) {
+  const values = sheet.getDataRange().getValues();
+  const searchId = String(id).trim().toLowerCase();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim().toLowerCase() === searchId) {
       sheet.deleteRow(i + 1);
-      return { status: 'success', message: 'Row deleted' };
+      return { status: 'success' };
     }
   }
-  return { status: 'error', message: 'Row not found' };
+  return { status: 'error' };
 }
 
 function bulkAddProducts(payload) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.PRODUCTS);
-  const existingData = sheet.getDataRange().getValues();
+  const values = sheet.getDataRange().getValues();
   const headers = HEADERS[SHEETS.PRODUCTS];
   const idMap = {};
-  for (let i = 1; i < existingData.length; i++) idMap[String(existingData[i][0])] = i + 1;
-  
+  for (let i = 1; i < values.length; i++) idMap[String(values[i][0]).trim().toLowerCase()] = i + 1;
   payload.forEach(item => {
-    const rowIndex = idMap[String(item.id)];
-    if (rowIndex) {
-      headers.forEach((h, colIndex) => {
+    const id = String(item.id).trim().toLowerCase();
+    const row = idMap[id];
+    if (row) {
+      headers.forEach((h, col) => {
         const val = item[h] !== undefined ? item[h] : (h === 'stock' ? item.quantity : undefined);
-        if (val !== undefined) sheet.getRange(rowIndex, colIndex + 1).setValue(val);
+        if (val !== undefined) sheet.getRange(row, col + 1).setValue(val);
       });
     } else {
       const newRow = headers.map(h => {
@@ -202,33 +196,89 @@ function bulkAddProducts(payload) {
         return item[h] !== undefined ? item[h] : (h === 'stock' ? (item.quantity || 0) : '');
       });
       sheet.appendRow(newRow);
-      idMap[newRow[0]] = sheet.getLastRow();
+      idMap[String(newRow[0]).trim().toLowerCase()] = sheet.getLastRow();
     }
   });
-  return { status: 'success', message: 'Bulk products processed' };
+  return { status: 'success' };
 }
 
-function logActivity(action, entity, entityId, details, status) {
+function createOrderTransaction(payload) {
+  const { customer, items, total, invoiceNumber } = payload;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const productSheet = ss.getSheetByName(SHEETS.PRODUCTS);
+  const prodData = productSheet.getDataRange().getValues();
+  const productMap = new Map();
+  for(let i=1; i<prodData.length; i++) productMap.set(String(prodData[i][0]).trim().toLowerCase(), i + 1);
+  const customerSheet = ss.getSheetByName(SHEETS.CUSTOMERS);
+  const custData = customerSheet.getDataRange().getValues();
+  let customerId = '';
+  for(let i=1; i<custData.length; i++) if(String(custData[i][2]) === String(customer.phone)) { customerId = custData[i][0]; break; }
+  if(!customerId) {
+    customerId = Utilities.getUuid();
+    customerSheet.appendRow([customerId, customer.name, customer.phone, customer.city, customer.type, new Date()]);
+  }
+  const orderId = Utilities.getUuid();
+  ss.getSheetByName(SHEETS.ORDERS).appendRow([orderId, invoiceNumber, customerId, total, 'completed', new Date()]);
+  const orderItemsSheet = ss.getSheetByName(SHEETS.ORDER_ITEMS);
+  items.forEach(item => {
+    orderItemsSheet.appendRow([Utilities.getUuid(), orderId, item.id || item.product_id, item.quantity, item.price || item.unit_price, item.quantity * (item.price || item.unit_price)]);
+    const row = productMap.get(String(item.id || item.product_id).trim().toLowerCase());
+    if(row) {
+      const stock = Number(prodData[row-1][5]) || 0;
+      productSheet.getRange(row, 6).setValue(stock - item.quantity);
+    }
+  });
+  return { status: 'success', orderId, invoiceNumber };
+}
+
+function getReportsData() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const orders = ss.getSheetByName(SHEETS.ORDERS).getDataRange().getValues();
+  const items = ss.getSheetByName(SHEETS.ORDER_ITEMS).getDataRange().getValues();
+  const prods = ss.getSheetByName(SHEETS.PRODUCTS).getDataRange().getValues();
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  let totalSales = 0, monthlySales = 0;
+  const dailySales = {}, categorySales = {}, productSales = {}, prodInfo = {};
+  for(let i=1; i<prods.length; i++) prodInfo[String(prods[i][0])] = { name: prods[i][1], cat: prods[i][2] };
+  for(let i=1; i<orders.length; i++) {
+    const date = new Date(orders[i][5]), amount = Number(orders[i][3]) || 0;
+    totalSales += amount;
+    if(date >= startOfMonth) monthlySales += amount;
+    const dStr = date.toISOString().split('T')[0];
+    dailySales[dStr] = (dailySales[dStr] || 0) + amount;
+  }
+  for(let i=1; i<items.length; i++) {
+    const pid = String(items[i][2]), qty = Number(items[i][3]) || 0, price = Number(items[i][4]) || 0, info = prodInfo[pid] || { name: 'Unknown', cat: 'Other' };
+    productSales[info.name] = (productSales[info.name] || 0) + qty;
+    categorySales[info.cat] = (categorySales[info.cat] || 0) + (qty * price);
+  }
+  return {
+    status: 'success',
+    data: {
+      totalSales, monthlySales, orderCount: orders.length - 1, dailySales, categorySales,
+      topProducts: Object.entries(productSales).sort((a,b) => b[1] - a[1]).slice(0, 5)
+    }
+  };
+}
+
+function logActivity(action, entity, id, details, status) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(SHEETS.LOGS);
-    if (!sheet) {
-       sheet = ss.insertSheet(SHEETS.LOGS);
-       sheet.appendRow(HEADERS[SHEETS.LOGS]);
-    }
-    sheet.appendRow([new Date(), action, entity, entityId, details, status]);
+    let sheet = ss.getSheetByName(SHEETS.LOGS) || ss.insertSheet(SHEETS.LOGS);
+    if (sheet.getLastRow() === 0) sheet.appendRow(HEADERS[SHEETS.LOGS]);
+    sheet.appendRow([new Date(), action, entity, id, details, status]);
   } catch (e) {}
 }
 
 function createJSONOutput(data) {
-  return ContentService.createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
 ```
 
 ## خطوة 3: التشغيل والنشر
 1. اضغط **Save**.
-2. اختر `setupDatabase` واضغط **Run**. (سيقوم بإنشاء 7 جداول بما فيها السجلات).
+2. اختر `setupDatabase` واضغط **Run**.
 3. اضغط **Deploy** > **New Deployment** > **Web App**.
 4. حدد الوصول لـ **Anyone**.
 5. انسخ الرابط الجديد وحدثه في موقعك.
