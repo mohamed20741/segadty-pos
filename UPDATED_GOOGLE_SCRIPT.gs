@@ -241,20 +241,43 @@ function updateProduct(data) {
 function bulkAddProducts(payload) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEETS.PRODUCTS);
+  const existingData = sheet.getDataRange().getValues();
   const headers = HEADERS[SHEETS.PRODUCTS];
   
+  // Map of existing IDs to their row index (1-based)
+  const idMap = {};
+  for (let i = 1; i < existingData.length; i++) {
+    idMap[String(existingData[i][0])] = i + 1;
+  }
+  
   payload.forEach(item => {
-    const newRow = headers.map(h => {
-      if (h === 'created_at') return new Date();
-      if (h === 'id' && !item[h]) return Utilities.getUuid();
-      // Handle quantity -> stock mapping if needed
-      const val = item[h] !== undefined ? item[h] : (h === 'stock' ? (item.quantity || 0) : '');
-      return val;
-    });
-    sheet.appendRow(newRow);
+    const id = String(item.id);
+    const rowIndex = idMap[id];
+    
+    if (rowIndex) {
+      // Update existing
+      headers.forEach((h, colIndex) => {
+        // Map quantity -> stock if needed
+        const val = item[h] !== undefined ? item[h] : (h === 'stock' ? (item.quantity) : undefined);
+        if (val !== undefined) {
+          sheet.getRange(rowIndex, colIndex + 1).setValue(val);
+        }
+      });
+    } else {
+      // Add new
+      const newRow = headers.map(h => {
+        if (h === 'created_at') return new Date();
+        if (h === 'id' && !item[h]) return Utilities.getUuid();
+        const val = item[h] !== undefined ? item[h] : (h === 'stock' ? (item.quantity || 0) : '');
+        return val;
+      });
+      sheet.appendRow(newRow);
+      // Update map to prevent duplicates in the same bulk upload
+      idMap[id || newRow[0]] = sheet.getLastRow();
+    }
   });
   
-  return createJSONOutput({ status: 'success', message: 'Bulk products added' });
+  return createJSONOutput({ status: 'success', message: 'Bulk products processed (Added/Updated)' });
 }
 
 // --- Helper Functions ---

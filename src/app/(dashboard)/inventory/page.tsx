@@ -84,12 +84,13 @@ export default function InventoryPage() {
     };
 
     const handleDownloadTemplate = () => {
-        const headers = "id,name,category,cost_price,selling_price,quantity,min_quantity\n";
-        const example = "P001,مثال منتج,سجاد,100,200,50,5";
+        // إضافة UTF-8 BOM لضمان دعم اللغة العربية في Excel
+        const headers = "\uFEFFid,name,category,cost_price,selling_price,quantity,min_quantity\n";
+        const example = "P001,سجادة صلاة فاخرة,سجاد,150,250,100,10\n";
         const blob = new Blob([headers + example], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.setAttribute("download", "inventory_template.csv");
+        link.setAttribute("download", "نموذج_رفع_المنتجات.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -102,29 +103,42 @@ export default function InventoryPage() {
         const reader = new FileReader();
         reader.onload = async (event) => {
             const csvText = event.target?.result as string;
-            const lines = csvText.split('\n');
+            // تنظيف أي BOM قد يتواجد في الملف المرفوع ومعالجة نهايات السطور
+            const cleanText = csvText.replace(/^\uFEFF/, "");
+            const lines = cleanText.split(/\r?\n/);
             const dataRows = lines.slice(1).filter(line => line.trim() !== "");
 
             const newProducts = dataRows.map(line => {
                 const cols = line.split(',');
+                if (cols.length < 5) return null;
                 return {
-                    id: cols[0],
-                    name: cols[1],
-                    category: cols[2],
-                    cost_price: Number(cols[3]),
-                    selling_price: Number(cols[4]),
-                    quantity: Number(cols[5]),
-                    min_quantity: Number(cols[6])
+                    id: cols[0]?.trim(),
+                    name: cols[1]?.trim(),
+                    category: cols[2]?.trim(),
+                    cost_price: Number(cols[3]) || 0,
+                    selling_price: Number(cols[4]) || 0,
+                    quantity: Number(cols[5]) || 0,
+                    min_quantity: Number(cols[6]) || 5
                 };
-            });
+            }).filter(p => p !== null) as Product[];
+
+            if (newProducts.length === 0) {
+                alert("تعذر قراءة البيانات من الملف. يرجى التأكد من الصيغة.");
+                return;
+            }
 
             setIsSaving(true);
-            await bulkAddProductsToSheet(newProducts);
-            await fetchProducts();
-            setIsSaving(false);
-            alert("تم رفع المنتجات بنجاح!");
+            try {
+                await bulkAddProductsToSheet(newProducts);
+                await fetchProducts();
+                setIsSaving(false);
+                alert(`تم رفع وتحديث ${newProducts.length} منتج بنجاح!`);
+            } catch (error) {
+                alert("حدث خطأ أثناء رفع البيانات.");
+                setIsSaving(false);
+            }
         };
-        reader.readAsText(file);
+        reader.readAsText(file, "UTF-8");
     };
 
     const getStockStatus = (p: Product) => {
