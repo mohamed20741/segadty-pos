@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  
+  --color-primary: #8B4513;
+  --color-primary-foreground: #FFFFFF;
+  
+  --color-secondary: #D4AF37;
+  --color-secondary-foreground: #000000;
+  
+  --color-accent: #006400;
+  --color-accent-foreground: #FFFFFF;
+  
+  --color-surface: #F5F5DC;
+  --color-surface-foreground: #3E2723;
+  
+  --color-muted: #f3f4f6;
+  --color-muted-foreground: #6b7280;
+
+  --font-sans: var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --background: #FAF9F6;
+  --foreground: #3E2723;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #1a1a1a;
+    --foreground: #F5F5DC;
+    --color-surface: #2C2C2C;
+    --color-surface-foreground: #F5F5DC;
+  }
+}
+
+/* Custom Base Styles */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Glassmorphism Utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
