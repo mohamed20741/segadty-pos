@@ -140,10 +140,14 @@ function getTableData(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) return { status: 'error', message: `Sheet ${sheetName} not found` };
   const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  if (data.length === 0) return { status: 'success', data: [] };
+  
+  const headers = data[0].map(h => String(h).trim().toLowerCase());
   const result = data.slice(1).map(row => {
     let obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    headers.forEach((h, i) => {
+      if (h) obj[h] = row[i];
+    });
     return obj;
   });
   return { status: 'success', data: result };
@@ -358,24 +362,48 @@ function loginUser(payload) {
   if (!username || !password) return { status: 'error', message: 'Username and password required' };
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
+  if (!sheet) return { status: 'error', message: 'Users sheet not found. Please run setup.' };
   
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return { status: 'error', message: 'No users found in database.' };
+  
+  const rawHeaders = data[0];
+  const normalizedHeaders = rawHeaders.map(h => String(h).trim().toLowerCase());
+  
+  // Find column indices
+  const userIdx = normalizedHeaders.findIndex(h => h === 'username' || h === 'user_name' || h === 'اسم المستخدم');
+  const passIdx = normalizedHeaders.findIndex(h => h === 'password' || h === 'كلمة المرور');
+  const statusIdx = normalizedHeaders.findIndex(h => h === 'status' || h === 'الحالة');
+  
+  if (userIdx === -1 || passIdx === -1) {
+    return { 
+      status: 'error', 
+      message: 'Required columns (username/password) not found. Found: ' + normalizedHeaders.join(', ') 
+    };
+  }
+
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const user = {};
-    headers.forEach((h, j) => user[h] = row[j]);
+    const currentUser = row[userIdx];
+    const currentPass = row[passIdx];
     
-    if (String(user.username).trim().toLowerCase() === String(username).trim().toLowerCase()) {
-      if (String(user.password) === String(password)) {
-        const status = String(user.status || 'active').trim().toLowerCase();
+    if (String(currentUser).trim().toLowerCase() === String(username).trim().toLowerCase()) {
+      if (String(currentPass) === String(password)) {
+        const status = statusIdx !== -1 ? String(row[statusIdx] || 'active').trim().toLowerCase() : 'active';
+        
         if (status === 'inactive' || status === 'blocked') {
           return { status: 'error', message: 'Account is ' + status };
         }
         
-        // Return user data without password
-        const { password: _, ...safeUser } = user;
-        return { status: 'success', data: safeUser };
+        // Construct user object for frontend
+        const userObj = {};
+        rawHeaders.forEach((h, j) => {
+          if (normalizedHeaders[j] !== 'password') {
+            userObj[normalizedHeaders[j]] = row[j];
+          }
+        });
+        
+        return { status: 'success', data: userObj };
       } else {
         return { status: 'error', message: 'Invalid password' };
       }
