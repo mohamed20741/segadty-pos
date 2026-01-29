@@ -3,6 +3,28 @@ import { Product, User, Branch } from "@/types";
 export const SHEET_URL = process.env.NEXT_PUBLIC_GOOGLE_SHEET_URL;
 
 /**
+ * دالة مساعدة لإرسال البيانات وانتظار الرد (تستخدم للعمليات التي تحتاج بيانات عائدة مثل تسجيل الدخول)
+ */
+async function postToSheetWithResponse(action: string, payload: any) {
+    if (!SHEET_URL) return { status: 'error', message: 'Sheet URL missing' };
+
+    try {
+        const response = await fetch(SHEET_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action, payload }),
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8'
+            }
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error(`Error in action ${action}:`, error);
+        return { status: 'error', message: String(error) };
+    }
+}
+
+/**
  * دالة مساعدة لإرسال البيانات إلى السكريبت بطريقة تمنع مشاكل الـ CORS
  * نستخدم 'text/plain' لتجنب الـ Preflight OPTIONS request
  */
@@ -10,7 +32,7 @@ async function postToSheet(action: string, payload: any) {
     if (!SHEET_URL) return { status: 'error', message: 'Sheet URL missing' };
 
     try {
-        const response = await fetch(SHEET_URL, {
+        await fetch(SHEET_URL, {
             method: 'POST',
             mode: 'no-cors', // نستخدم no-cors لضمان وصول الطلب دون اعتراض المتصفح
             body: JSON.stringify({ action, payload }),
@@ -136,10 +158,31 @@ export async function getUsersFromSheet(): Promise<User[] | null> {
 }
 
 /**
+ * تسجيل الدخول
+ */
+export async function loginUser(credentials: any) {
+    return postToSheetWithResponse('login', credentials);
+}
+
+/**
  * إضافة مستخدم جديد
  */
 export async function addUserToSheet(userData: Partial<User>) {
     return postToSheet('addUser', userData);
+}
+
+/**
+ * تحديث بيانات مستخدم
+ */
+export async function updateUserInSheet(userData: Partial<User>) {
+    return postToSheet('updateUser', userData);
+}
+
+/**
+ * حذف مستخدم
+ */
+export async function deleteUserFromSheet(id: string) {
+    return postToSheet('deleteUser', { id: String(id).trim() });
 }
 
 /**

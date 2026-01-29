@@ -1,9 +1,10 @@
 "use client";
 
-import { Bell, Search, Database, CheckCircle, XCircle, Loader2, RefreshCw } from "lucide-react";
+import { Bell, Search, Database, CheckCircle, XCircle, Loader2, RefreshCw, LogOut, User as UserIcon } from "lucide-react";
 import { useState, useEffect } from "react";
 import { testConnection } from "@/lib/google-sheets";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 function DbStatusButton() {
     const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -59,6 +60,19 @@ function DbStatusButton() {
 }
 
 export function Header() {
+    const { user, logout } = useAuth();
+    const [showNotifications, setShowNotifications] = useState(false);
+
+    // Generate initials from name
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+    };
+
     return (
         <header className="h-20 bg-white border-b border-gray-100 px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm/50 backdrop-blur-md bg-white/90">
             <div className="flex items-center gap-6 flex-1">
@@ -79,21 +93,71 @@ export function Header() {
             </div>
 
             <div className="flex items-center gap-6">
-                <button className="relative p-2.5 rounded-full hover:bg-gray-100/80 transition-colors text-gray-500 hover:text-primary">
-                    <Bell className="w-6 h-6" />
-                    <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white ring-1 ring-red-500/20" />
-                </button>
+                <div className="relative">
+                    <button
+                        onClick={() => setShowNotifications(!showNotifications)}
+                        className={cn(
+                            "relative p-2.5 rounded-full transition-all duration-300",
+                            showNotifications ? "bg-primary/10 text-primary" : "hover:bg-gray-100/80 text-gray-500 hover:text-primary"
+                        )}
+                    >
+                        <Bell className="w-6 h-6" />
+                        <span className="absolute top-2 right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+                    </button>
+
+                    {showNotifications && (
+                        <div className="absolute left-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 py-4 z-50 animate-in fade-in slide-in-from-top-3 duration-300">
+                            <div className="px-6 pb-3 border-b border-gray-50 flex items-center justify-between">
+                                <h3 className="font-bold text-gray-800">التنبيهات</h3>
+                                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">3 جديدة</span>
+                            </div>
+                            <div className="max-h-[300px] overflow-y-auto">
+                                {[
+                                    { title: "طلب جديد", desc: "تم تسجيل طلب جديد برقم #INV-102", time: "منذ دقيقتين", color: "text-blue-600 bg-blue-50" },
+                                    { title: "نقص في المخزون", desc: "سجادة صلاة ملكي اقتربت من الانتهاء", time: "منذ ساعة", color: "text-red-600 bg-red-50" },
+                                    { title: "تهيئة النظام", desc: "تم تحديث صلاحيات المستخدمين بنجاح", time: "منذ 3 ساعات", color: "text-green-600 bg-green-50" },
+                                ].map((item, i) => (
+                                    <div key={i} className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50/50 last:border-0">
+                                        <div className="flex gap-3">
+                                            <div className={cn("w-10 h-10 rounded-xl shrink-0 flex items-center justify-center font-bold text-xs", item.color)}>
+                                                {item.title[0]}
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-bold text-gray-800">{item.title}</p>
+                                                <p className="text-xs text-gray-500 line-clamp-1">{item.desc}</p>
+                                                <p className="text-[10px] text-gray-400 mt-1">{item.time}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="px-6 pt-3 mt-1 text-center">
+                                <button className="text-xs font-bold text-primary hover:underline">عرض كل التنبيهات</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 <div className="h-8 w-px bg-gray-200 mx-2"></div>
 
-                <div className="flex items-center gap-3 cursor-pointer p-1 rounded-xl hover:bg-gray-50 transition-colors">
-                    <div className="text-left hidden md:block leading-tight">
-                        <p className="text-sm font-bold text-gray-800">محمد علي</p>
-                        <p className="text-xs text-secondary font-medium">مدير المعرض</p>
+                <div className="flex items-center gap-3 p-1 rounded-xl">
+                    <div className="text-right hidden md:block leading-tight">
+                        <p className="text-sm font-bold text-gray-800">{user?.name || "جاري التحميل..."}</p>
+                        <p className="text-xs text-secondary font-medium">
+                            {user?.role === 'admin' ? 'مدير النظام' : user?.role === 'manager' ? 'مدير المعرض' : 'كاشير'}
+                        </p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#5D4037] flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20 ring-2 ring-white">
-                        MA
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#5D4037] flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20 ring-2 ring-white overflow-hidden">
+                        {user?.name ? getInitials(user.name) : <UserIcon className="w-5 h-5" />}
                     </div>
+
+                    <button
+                        onClick={logout}
+                        title="تسجيل الخروج"
+                        className="mr-2 p-2 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-600 transition-all hover:rotate-12"
+                    >
+                        <LogOut className="w-5 h-5" />
+                    </button>
                 </div>
             </div>
         </header>

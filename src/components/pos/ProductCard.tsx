@@ -18,11 +18,13 @@ export function ProductCard({ product }: ProductCardProps) {
             <div className="relative h-40 bg-gray-100 flex items-center justify-center overflow-hidden">
                 {product.image ? (
                     <div className="relative w-full h-full">
-                        {/* Normally we would use Image from next/image, but for now with mock paths we might get errors if files don't exist.
-                   Using a fallback div for safety if image fails or path is mock */}
-                        <div className="absolute inset-0 bg-secondary/10 flex items-center justify-center text-secondary/30 font-bold text-4xl">
-                            {product.name.charAt(0)}
-                        </div>
+                        <Image
+                            src={product.image}
+                            alt={product.name}
+                            fill
+                            className="object-cover group-hover:scale-110 transition-transform duration-500"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                        />
                     </div>
                 ) : (
                     <div className="absolute inset-0 bg-secondary/5 flex items-center justify-center text-secondary/20">

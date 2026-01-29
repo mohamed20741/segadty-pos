@@ -3,21 +3,42 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { User, Lock, Eye, EyeOff, Globe, Phone } from "lucide-react";
+import { User as UserIcon, Lock, Eye, EyeOff, Globe, Phone, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { loginUser as apiLogin } from "@/lib/google-sheets";
 
 export default function LoginPage() {
+    const { login } = useAuth();
     const router = useRouter();
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const [formData, setFormData] = useState({
+        username: "",
+        password: ""
+    });
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        // Simulate login delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setIsLoading(false);
-        router.push("/dashboard");
+        setError(null);
+
+        try {
+            const response = await apiLogin(formData);
+
+            if (response.status === 'success') {
+                login(response.data);
+            } else {
+                setError(response.message || "فشل تسجيل الدخول. يرجى التحقق من البيانات.");
+            }
+        } catch (err) {
+            console.error("Login error:", err);
+            setError("حدث خطأ أثناء الاتصال بالخادم. يرجى المحاولة لاحقاً.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -46,14 +67,24 @@ export default function LoginPage() {
                     <p className="text-gray-500 font-medium">بوابة دخول الموظفين</p>
                 </div>
 
+                {/* Error Message */}
+                {error && (
+                    <div className="mb-6 p-4 bg-red-50 border-r-4 border-red-500 rounded-lg flex items-center gap-3 text-red-700 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <AlertCircle className="w-5 h-5 shrink-0" />
+                        <p className="text-sm font-medium">{error}</p>
+                    </div>
+                )}
+
                 {/* Form */}
                 <form onSubmit={handleLogin} className="space-y-6">
                     <div className="space-y-2">
                         <label className="text-sm font-bold text-gray-700 mr-1">اسم المستخدم</label>
                         <Input
-                            startIcon={<User className="w-5 h-5" />}
+                            startIcon={<UserIcon className="w-5 h-5" />}
                             placeholder="user@segadty.com"
                             className="bg-gray-50 border-gray-200 focus:bg-white h-12"
+                            value={formData.username}
+                            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                             required
                         />
                     </div>
@@ -63,6 +94,8 @@ export default function LoginPage() {
                         <Input
                             type={showPassword ? "text" : "password"}
                             startIcon={<Lock className="w-5 h-5" />}
+                            value={formData.password}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                             endIcon={
                                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="hover:text-primary transition-colors focus:outline-none">
                                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}

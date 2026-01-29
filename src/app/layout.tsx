@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   description: "نظام نقاط بيع متكامل لسجادات الصلاة - إدارة المبيعات والمخزون",
 };
 
+import { AuthProvider } from "@/context/AuthContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -21,7 +23,9 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className={`${cairo.variable} antialiased bg-background text-foreground`}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

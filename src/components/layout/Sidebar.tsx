@@ -15,20 +15,27 @@ import {
     Database
 } from "lucide-react";
 
+import { useAuth } from "@/context/AuthContext";
+
 const menuItems = [
-    { href: "/dashboard", label: "الرئيسية", icon: LayoutDashboard },
-    { href: "/pos", label: "نقطة البيع", icon: ShoppingCart },
-    { href: "/inventory", label: "المخزون", icon: Package },
-    { href: "/reports", label: "التقارير", icon: BarChart3 },
-    { href: "/branches", label: "الفروع", icon: Store },
-    { href: "/users", label: "المستخدمين", icon: Users },
-    { href: "/admin/logs", label: "سجل العمليات", icon: Database },
-    { href: "/admin/migrate", label: "نقل البيانات", icon: Database },
-    { href: "/settings", label: "الإعدادات", icon: Settings },
+    { href: "/dashboard", label: "الرئيسية", icon: LayoutDashboard, roles: ['admin', 'manager', 'cashier'] },
+    { href: "/pos", label: "نقطة البيع", icon: ShoppingCart, roles: ['admin', 'manager', 'cashier'] },
+    { href: "/inventory", label: "المخزون", icon: Package, roles: ['admin', 'manager'] },
+    { href: "/reports", label: "التقارير", icon: BarChart3, roles: ['admin', 'manager'] },
+    { href: "/branches", label: "الفروع", icon: Store, roles: ['admin'] },
+    { href: "/users", label: "المستخدمين", icon: Users, roles: ['admin'] },
+    { href: "/admin/logs", label: "سجل العمليات", icon: Database, roles: ['admin'] },
+    { href: "/admin/migrate", label: "نقل البيانات", icon: Database, roles: ['admin'] },
+    { href: "/settings", label: "الإعدادات", icon: Settings, roles: ['admin', 'manager'] },
 ];
 
 export function Sidebar() {
     const pathname = usePathname();
+    const { user, logout } = useAuth();
+
+    const filteredMenuItems = menuItems.filter(item =>
+        !item.roles || (user && item.roles.includes(user.role))
+    );
 
     return (
         <aside className="hidden md:flex flex-col w-72 bg-[#3E2723] text-white border-l border-[#5D4037] h-screen shadow-2xl transition-all">
@@ -43,7 +50,7 @@ export function Sidebar() {
             </div>
 
             <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-                {menuItems.map((item) => {
+                {filteredMenuItems.map((item) => {
                     const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
                     return (
                         <Link
@@ -68,7 +75,10 @@ export function Sidebar() {
             </nav>
 
             <div className="p-4 border-t border-white/10 bg-[#321f1b]">
-                <button className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-red-300 hover:bg-red-500/10 hover:text-red-200 transition-colors">
+                <button
+                    onClick={logout}
+                    className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-red-300 hover:bg-red-500/10 hover:text-red-200 transition-colors"
+                >
                     <LogOut className="w-5 h-5" />
                     <span className="font-medium">تسجيل الخروج</span>
                 </button>

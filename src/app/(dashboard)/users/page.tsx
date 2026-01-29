@@ -12,15 +12,22 @@ import {
     UserCheck,
     Search,
     Loader2,
-    MoreVertical,
-    Lock
+    Lock,
+    Edit2,
+    Trash2,
+    RefreshCw
 } from "lucide-react";
+
+import { updateUserInSheet, deleteUserFromSheet } from "@/lib/google-sheets";
+
+const VERSION = "1.2.0"; // للتأكد من تحديث النسخة لدى المستخدم
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [branches, setBranches] = useState<Branch[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
 
     const [newUser, setNewUser] = useState<Partial<User>>({
@@ -43,6 +50,7 @@ export default function UsersPage() {
                 getUsersFromSheet(),
                 getBranchesFromSheet()
             ]);
+            console.log("Users Data Fetched:", usersData); // Debug log
             if (usersData) setUsers(usersData);
             if (branchesData) setBranches(branchesData);
         } catch (error) {
@@ -69,10 +77,41 @@ export default function UsersPage() {
         }
     };
 
+    const handleUpdateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingUser) return;
+        const res = await updateUserInSheet(editingUser);
+        if (res.status === 'success') {
+            setEditingUser(null);
+            fetchData();
+        }
+    };
+
+    const handleDeleteUser = async (id: string) => {
+        if (!confirm("هل أنت متأكد من حذف هذا المستخدم؟")) return;
+        const res = await deleteUserFromSheet(id);
+        if (res.status === 'success') {
+            fetchData();
+        }
+    };
+
+    const toggleStatus = async (user: User) => {
+        const currentActive = isUserActive(user.status);
+        const newStatus = currentActive ? 'inactive' : 'active';
+        await updateUserInSheet({ ...user, status: newStatus as any });
+        fetchData();
+    };
+
     const filteredUsers = users.filter(user =>
         (user.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
         (user.username?.toLowerCase() || "").includes(searchTerm.toLowerCase())
     );
+
+    const isUserActive = (status: any) => {
+        if (!status) return false;
+        const s = status.toString().trim().toLowerCase();
+        return s === 'active' || s === 'نشط' || s === '1' || s === 'true' || s === 'yes' || s === 'active ';
+    };
 
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -85,13 +124,23 @@ export default function UsersPage() {
                     </h1>
                     <p className="text-gray-500 mt-1">إضافة وإدارة موظفي الفروع وصلاحياتهم</p>
                 </div>
-                <Button
-                    onClick={() => setIsAddModalOpen(true)}
-                    className="h-12 px-6 gap-2 text-lg font-bold shadow-lg shadow-primary/20"
-                >
-                    <Plus className="w-5 h-5" />
-                    إضافة مستخدم جديد
-                </Button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => fetchData()}
+                        disabled={isLoading}
+                        className="h-12 px-4 rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors"
+                        title="تحديث البيانات"
+                    >
+                        <RefreshCw className={`w-5 h-5 text-gray-400 ${isLoading ? "animate-spin" : ""}`} />
+                    </button>
+                    <Button
+                        onClick={() => setIsAddModalOpen(true)}
+                        className="h-12 px-6 gap-2 text-lg font-bold shadow-lg shadow-primary/20"
+                    >
+                        <Plus className="w-5 h-5" />
+                        إضافة مستخدم جديد
+                    </Button>
+                </div>
             </div>
 
             {/* Stats section */}
@@ -102,7 +151,7 @@ export default function UsersPage() {
                     </div>
                     <div>
                         <p className="text-sm text-gray-500">مستخدم نشط</p>
-                        <p className="text-2xl font-bold text-gray-800">{users.filter(u => u.status === 'active').length}</p>
+                        <p className="text-2xl font-bold text-gray-800">{users.filter(u => isUserActive(u.status)).length}</p>
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4">
@@ -148,7 +197,7 @@ export default function UsersPage() {
                                 <th className="px-6 py-4">الدور</th>
                                 <th className="px-6 py-4">الفرع</th>
                                 <th className="px-6 py-4">الحالة</th>
-                                <th className="px-6 py-4">الإجراءات</th>
+                                <th className="px-6 py-4 text-center">الإجراءات</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -175,8 +224,8 @@ export default function UsersPage() {
                                         <td className="px-6 py-4 font-mono text-sm text-gray-600">{user.username}</td>
                                         <td className="px-6 py-4">
                                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${user.role === 'admin' ? 'bg-purple-50 text-purple-600' :
-                                                    user.role === 'manager' ? 'bg-blue-50 text-blue-600' :
-                                                        'bg-green-50 text-green-600'
+                                                user.role === 'manager' ? 'bg-blue-50 text-blue-600' :
+                                                    'bg-green-50 text-green-600'
                                                 }`}>
                                                 {user.role === 'admin' ? 'مدير نظام' :
                                                     user.role === 'manager' ? 'مدير فرع' : 'كاشير'}
@@ -186,15 +235,33 @@ export default function UsersPage() {
                                             {branches.find(b => b.id === user.branch_id)?.name || 'كل الفروع'}
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className={`w-2 h-2 rounded-full ${user.status === 'active' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-red-400'}`} />
-                                                <span className="text-sm font-medium">{user.status === 'active' ? 'نشط' : 'معطل'}</span>
-                                            </div>
+                                            <button
+                                                onClick={() => toggleStatus(user)}
+                                                className="flex items-center gap-2 group cursor-pointer"
+                                            >
+                                                <div className={`w-2 h-2 rounded-full transition-all group-hover:scale-125 ${isUserActive(user.status) ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-red-400'}`} />
+                                                <span className={`text-sm font-medium ${isUserActive(user.status) ? 'text-green-700' : 'text-red-600'}`}>
+                                                    {isUserActive(user.status) ? 'نشط' : 'معطل'}
+                                                </span>
+                                            </button>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400">
-                                                <MoreVertical className="w-5 h-5" />
-                                            </button>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() => setEditingUser(user)}
+                                                    className="p-2 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
+                                                    title="تعديل"
+                                                >
+                                                    <Edit2 className="w-5 h-5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteUser(user.id)}
+                                                    className="p-2 hover:bg-red-50 rounded-lg text-red-500 transition-colors"
+                                                    title="حذف"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))
@@ -293,6 +360,96 @@ export default function UsersPage() {
                     </div>
                 </div>
             )}
+            {/* Edit User Modal */}
+            {editingUser && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300 relative">
+                        <div className="p-8">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-6">تعديل بيانات المستخدم</h2>
+
+                            <form onSubmit={handleUpdateUser} className="space-y-5">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">الاسم الكامل</label>
+                                    <Input
+                                        required
+                                        value={editingUser.name}
+                                        onChange={e => setEditingUser(prev => prev ? ({ ...prev, name: e.target.value }) : null)}
+                                        placeholder="مثال: خالد العتيبي"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">اسم المستخدم</label>
+                                    <Input
+                                        required
+                                        value={editingUser.username}
+                                        onChange={e => setEditingUser(prev => prev ? ({ ...prev, username: e.target.value }) : null)}
+                                        placeholder="khaled_99"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">كلمة المرور (اتركها فارغة إذا لم تكن تريد التغيير)</label>
+                                    <div className="relative">
+                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <Input
+                                            type="password"
+                                            value={editingUser.password || ""}
+                                            onChange={e => setEditingUser(prev => prev ? ({ ...prev, password: e.target.value }) : null)}
+                                            placeholder="••••••••"
+                                            className="pl-10"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-gray-700">الصلاحية</label>
+                                        <select
+                                            className="w-full h-11 px-3 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
+                                            value={editingUser.role}
+                                            onChange={e => setEditingUser(prev => prev ? ({ ...prev, role: e.target.value as any }) : null)}
+                                        >
+                                            <option value="cashier">كاشير</option>
+                                            <option value="manager">مدير فرع</option>
+                                            <option value="admin">مدير نظام</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-gray-700">الحالة</label>
+                                        <select
+                                            className="w-full h-11 px-3 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
+                                            value={editingUser.status}
+                                            onChange={e => setEditingUser(prev => prev ? ({ ...prev, status: e.target.value as any }) : null)}
+                                        >
+                                            <option value="active">نشط</option>
+                                            <option value="inactive">معطل</option>
+                                            <option value="blocked">محظور</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-4">
+                                    <Button
+                                        type="submit"
+                                        className="flex-1 h-12 font-bold bg-blue-600 hover:bg-blue-700"
+                                    >
+                                        حفظ التعديلات
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setEditingUser(null)}
+                                        className="h-12 px-6"
+                                    >
+                                        إلغاء
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <div className="fixed bottom-4 left-4 text-[10px] text-gray-300 pointer-events-none">
+                v{VERSION}
+            </div>
         </div>
     );
 }

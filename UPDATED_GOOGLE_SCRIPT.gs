@@ -111,6 +111,18 @@ function doPost(e) {
         logActivity(postData.payload.action, postData.payload.entity, postData.payload.entity_id, postData.payload.details, postData.payload.status);
         response = { status: 'success' };
         break;
+      case 'login':
+        response = loginUser(postData.payload);
+        logActivity('LOGIN', 'USER', postData.payload.username, 'Login attempt', response.status);
+        break;
+      case 'updateUser':
+        response = updateUser(postData.payload);
+        logActivity('UPDATE', 'USER', String(postData.payload.id), JSON.stringify(postData.payload), response.status);
+        break;
+      case 'deleteUser':
+        response = deleteRow(SHEETS.USERS, postData.payload.id);
+        logActivity('DELETE', 'USER', String(postData.payload.id), 'Deleted', response.status);
+        break;
       default:
         response = { status: 'error', message: 'Invalid action' };
     }
@@ -271,6 +283,27 @@ function createOrderTransaction(payload) {
   return { status: 'success', message: 'Order created', orderId, invoiceNumber };
 }
 
+function updateUser(data) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+  const headers = values[0];
+  
+  const searchId = String(data.id).trim().toLowerCase();
+  
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]).trim().toLowerCase() === searchId) {
+      headers.forEach((colName, colIndex) => {
+        if (data[colName] !== undefined && colName !== 'id') {
+          sheet.getRange(i + 1, colIndex + 1).setValue(data[colName]);
+        }
+      });
+      return { status: 'success', message: 'User updated' };
+    }
+  }
+  return { status: 'error', message: 'User not found' };
+}
+
 function getReportsData() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const orders = ss.getSheetByName(SHEETS.ORDERS).getDataRange().getValues();
@@ -318,6 +351,38 @@ function getReportsData() {
       topProducts: Object.entries(productSales).sort((a,b) => b[1] - a[1]).slice(0, 5)
     }
   };
+}
+
+function loginUser(payload) {
+  const { username, password } = payload;
+  if (!username || !password) return { status: 'error', message: 'Username and password required' };
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEETS.USERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const user = {};
+    headers.forEach((h, j) => user[h] = row[j]);
+    
+    if (String(user.username).trim().toLowerCase() === String(username).trim().toLowerCase()) {
+      if (String(user.password) === String(password)) {
+        const status = String(user.status || 'active').trim().toLowerCase();
+        if (status === 'inactive' || status === 'blocked') {
+          return { status: 'error', message: 'Account is ' + status };
+        }
+        
+        // Return user data without password
+        const { password: _, ...safeUser } = user;
+        return { status: 'success', data: safeUser };
+      } else {
+        return { status: 'error', message: 'Invalid password' };
+      }
+    }
+  }
+  
+  return { status: 'error', message: 'User not found' };
 }
 
 function logActivity(action, entity, entityId, details, status) {
