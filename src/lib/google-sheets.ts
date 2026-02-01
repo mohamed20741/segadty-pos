@@ -158,6 +158,43 @@ export async function getUsersFromSheet(): Promise<User[] | null> {
 }
 
 /**
+ * البحث عن فاتورة
+ */
+export async function searchInvoice(query: string) {
+    if (!SHEET_URL) return null;
+    try {
+        const res = await fetch(`${SHEET_URL}?action=searchInvoice&query=${encodeURIComponent(query)}`);
+        const json = await res.json();
+        return json;
+    } catch (error) {
+        console.error("Failed to search invoices:", error);
+        return { status: 'error', message: String(error) };
+    }
+}
+
+/**
+ * جلب تفاصيل فاتورة
+ */
+export async function getInvoiceDetails(invoiceId: string) {
+    if (!SHEET_URL) return null;
+    try {
+        const res = await fetch(`${SHEET_URL}?action=getInvoiceDetails&invoiceId=${encodeURIComponent(invoiceId)}`);
+        const json = await res.json();
+        return json;
+    } catch (error) {
+        console.error("Failed to fetch invoice details:", error);
+        return { status: 'error', message: String(error) };
+    }
+}
+
+/**
+ * معالجة عملية استرجاع أو استبدال
+ */
+export async function processReturnExchange(payload: any) {
+    return postToSheetWithResponse('processReturnExchange', payload);
+}
+
+/**
  * تسجيل الدخول
  */
 export async function loginUser(credentials: any) {

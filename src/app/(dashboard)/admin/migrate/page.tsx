@@ -144,9 +144,11 @@ export default function MigratePage() {
                 </h3>
                 <ul className="space-y-2 text-blue-800 text-sm">
                     <li>✅ إنشاء الجداول في Google Sheets (products, customers, orders, order_items)</li>
+                    <li>✅ إنشاء جداول الاسترجاع والتبديل (returns_exchanges, return_exchange_items)</li>
+                    <li>✅ إنشاء سجل حركة المخزون والتسويات المالية (stock_movements, payments_adjustments)</li>
                     <li>✅ نقل {mockProducts.length} منتجات موجودة حالياً في التطبيق</li>
                     <li>✅ ربط التطبيق بقاعدة البيانات السحابية</li>
-                    <li>⚠️ تأكد من إعداد Google Apps Script أولاً (راجع GOOGLE_SHEET_SETUP.md)</li>
+                    <li>⚠️ تأكد من تحديث Google Apps Script أولاً بالكود الجديد</li>
                 </ul>
             </div>
 

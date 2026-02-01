@@ -1,6 +1,6 @@
 /**
  * Segadty POS Backend - Professional Google Apps Script
- * v1.3.0 - التحسين النهائي للعلاقات، الحذف، التقارير، وتحديث البيانات
+ * v1.4.0 - دعم وحدة الاستبدال والاسترجاع والتحكم بالمخزون
  */
 
 // --- التكوين (Configuration) ---
@@ -11,17 +11,25 @@ const SHEETS = {
   ORDER_ITEMS: 'order_items',
   USERS: 'users',
   BRANCHES: 'branches',
-  LOGS: 'logs'
+  LOGS: 'logs',
+  RETURNS_EXCHANGES: 'returns_exchanges',
+  RETURN_EXCHANGE_ITEMS: 'return_exchange_items',
+  STOCK_MOVEMENTS: 'stock_movements',
+  PAYMENTS_ADJUSTMENTS: 'payments_adjustments'
 };
 
 const HEADERS = {
   [SHEETS.PRODUCTS]: ['id', 'name', 'category', 'cost_price', 'selling_price', 'stock', 'min_quantity', 'image', 'created_at'],
   [SHEETS.CUSTOMERS]: ['id', 'name', 'phone', 'city', 'type', 'created_at'],
   [SHEETS.ORDERS]: ['id', 'invoice_number', 'customer_id', 'total_amount', 'status', 'created_at'],
-  [SHEETS.ORDER_ITEMS]: ['id', 'order_id', 'product_id', 'quantity', 'unit_price', 'subtotal'],
+  [SHEETS.ORDER_ITEMS]: ['id', 'order_id', 'product_id', 'sku', 'product_name', 'quantity', 'unit_price', 'subtotal', 'vat'],
   [SHEETS.USERS]: ['id', 'username', 'name', 'role', 'password', 'branch_id', 'status', 'created_at'],
   [SHEETS.BRANCHES]: ['id', 'name', 'location', 'phone', 'is_active', 'created_at'],
-  [SHEETS.LOGS]: ['timestamp', 'action', 'entity', 'entity_id', 'details', 'status']
+  [SHEETS.LOGS]: ['timestamp', 'action', 'entity', 'entity_id', 'details', 'status'],
+  [SHEETS.RETURNS_EXCHANGES]: ['id', 'invoice_id', 'operation_type', 'total_amount', 'vat_adjustment', 'created_at', 'created_by'],
+  [SHEETS.RETURN_EXCHANGE_ITEMS]: ['id', 'operation_id', 'sku', 'qty', 'price_difference', 'reason'],
+  [SHEETS.STOCK_MOVEMENTS]: ['id', 'sku', 'qty', 'movement_type', 'reference_type', 'reference_id', 'created_at'],
+  [SHEETS.PAYMENTS_ADJUSTMENTS]: ['id', 'operation_id', 'amount', 'method', 'direction']
 };
 
 // --- دالة الإعداد (Setup) ---
@@ -39,6 +47,17 @@ function setupDatabase() {
            .setFontWeight("bold")
            .setBackground("#f3f4f6");
       sheet.setFrozenRows(1);
+    } else {
+      // التحقق من توافق الأعمدة
+      const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      if (currentHeaders.length < HEADERS[sheetName].length) {
+         // تحديث الأعمدة إذا كانت ناقصة (إضافة الأعمدة الجديدة فقط)
+         HEADERS[sheetName].forEach((h, i) => {
+           if (i >= currentHeaders.length) {
+             sheet.getRange(1, i + 1).setValue(h).setFontWeight("bold").setBackground("#f3f4f6");
+           }
+         });
+      }
     }
   });
   
@@ -64,6 +83,8 @@ function doGet(e) {
     case 'getOrders': response = getTableData(SHEETS.ORDERS); break;
     case 'getLogs': response = getTableData(SHEETS.LOGS); break;
     case 'getReportsData': response = getReportsData(); break;
+    case 'searchInvoice': response = searchInvoice(e.parameter.query); break;
+    case 'getInvoiceDetails': response = getInvoiceDetails(e.parameter.invoiceId); break;
     case 'setup': response = setupDatabase(); break;
     default: response = { status: 'error', message: 'Invalid action' };
   }
@@ -82,6 +103,10 @@ function doPost(e) {
       case 'createOrder':
         response = createOrderTransaction(postData.payload);
         logActivity('CREATE', 'ORDER', response.orderId || 'N/A', JSON.stringify(postData.payload), response.status);
+        break;
+      case 'processReturnExchange':
+        response = processReturnExchangeTransaction(postData.payload);
+        logActivity(postData.payload.operation_type, 'RETURN_EXCHANGE', response.operationId || 'N/A', JSON.stringify(postData.payload), response.status);
         break;
       case 'addProduct':
         response = addRow(SHEETS.PRODUCTS, postData.payload);
@@ -140,7 +165,7 @@ function getTableData(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
   if (!sheet) return { status: 'error', message: `Sheet ${sheetName} not found` };
   const data = sheet.getDataRange().getValues();
-  if (data.length === 0) return { status: 'success', data: [] };
+  if (data.length <= 1) return { status: 'success', data: [] };
   
   const headers = data[0].map(h => String(h).trim().toLowerCase());
   const result = data.slice(1).map(row => {
@@ -151,6 +176,96 @@ function getTableData(sheetName) {
     return obj;
   });
   return { status: 'success', data: result };
+}
+
+function searchInvoice(query) {
+  if (!query) return { status: 'error', message: 'Query is missing' };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ordersSheet = ss.getSheetByName(SHEETS.ORDERS);
+  const customersSheet = ss.getSheetByName(SHEETS.CUSTOMERS);
+  
+  const orders = ordersSheet.getDataRange().getValues();
+  const customers = customersSheet.getDataRange().getValues();
+  
+  const customerMap = {};
+  for(let i=1; i<customers.length; i++) {
+    customerMap[customers[i][0]] = { name: customers[i][1], phone: customers[i][2] };
+  }
+  
+  const results = [];
+  const q = String(query).toLowerCase();
+  
+  for(let i=1; i<orders.length; i++) {
+    const invNo = String(orders[i][1]).toLowerCase();
+    const custId = orders[i][2];
+    const cust = customerMap[custId] || { name: 'Unknown', phone: '0' };
+    
+    if (invNo.includes(q) || cust.name.toLowerCase().includes(q) || String(cust.phone).includes(q)) {
+      results.push({
+        id: orders[i][0],
+        invoice_number: orders[i][1],
+        customer_name: cust.name,
+        customer_phone: cust.phone,
+        total_amount: orders[i][3],
+        status: orders[i][4],
+        created_at: orders[i][5]
+      });
+    }
+  }
+  return { status: 'success', data: results };
+}
+
+function getInvoiceDetails(invoiceId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ordersSheet = ss.getSheetByName(SHEETS.ORDERS);
+  const orderItemsSheet = ss.getSheetByName(SHEETS.ORDER_ITEMS);
+  const returnsSheet = ss.getSheetByName(SHEETS.RETURNS_EXCHANGES);
+  
+  const orders = ordersSheet.getDataRange().getValues();
+  let order = null;
+  for(let i=1; i<orders.length; i++) {
+    if (orders[i][0] === invoiceId) {
+      order = {
+        id: orders[i][0],
+        invoice_number: orders[i][1],
+        customer_id: orders[i][2],
+        total_amount: orders[i][3],
+        status: orders[i][4],
+        created_at: orders[i][5]
+      };
+      break;
+    }
+  }
+  
+  if (!order) return { status: 'error', message: 'Invoice not found' };
+  
+  // Check if already returned/exchanged
+  const returns = returnsSheet.getDataRange().getValues();
+  for(let i=1; i<returns.length; i++) {
+    if (returns[i][1] === invoiceId) {
+      return { status: 'error', message: 'هذه الفاتورة تم عمل عملية استرجاع/استبدال لها مسبقاً' };
+    }
+  }
+  
+  const items = orderItemsSheet.getDataRange().getValues();
+  const orderItems = [];
+  for(let i=1; i<items.length; i++) {
+    if (items[i][1] === invoiceId) {
+      orderItems.push({
+        id: items[i][0],
+        order_id: items[i][1],
+        product_id: items[i][2],
+        sku: items[i][3],
+        product_name: items[i][4],
+        quantity: items[i][5],
+        unit_price: items[i][6],
+        subtotal: items[i][7],
+        vat: items[i][8] || 0
+      });
+    }
+  }
+  
+  return { status: 'success', data: { order, items: orderItems } };
 }
 
 function addRow(sheetName, data) {
@@ -240,7 +355,7 @@ function bulkAddProducts(payload) {
 }
 
 function createOrderTransaction(payload) {
-  const { customer, items, total, invoiceNumber } = payload;
+  const { customer, items, total, invoiceNumber, tax } = payload;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   
   const productSheet = ss.getSheetByName(SHEETS.PRODUCTS);
@@ -272,19 +387,127 @@ function createOrderTransaction(payload) {
       Utilities.getUuid(),
       orderId,
       item.id || item.product_id,
+      item.sku || '',
+      item.name || '',
       item.quantity,
       item.price || item.unit_price,
-      item.quantity * (item.price || item.unit_price)
+      item.quantity * (item.price || item.unit_price),
+      (item.quantity * (item.price || item.unit_price)) * 0.15 // Default 15% VAT
     ]);
     
+    // Update Stock
     const rowIndex = productMap.get(String(item.id || item.product_id).trim().toLowerCase());
     if(rowIndex) {
       const currentStock = Number(prodData[rowIndex-1][5]) || 0;
       productSheet.getRange(rowIndex, 6).setValue(currentStock - item.quantity);
+      
+      // Log Stock Movement
+      addRow(SHEETS.STOCK_MOVEMENTS, {
+        sku: item.id || item.product_id,
+        qty: item.quantity,
+        movement_type: 'OUT',
+        reference_type: 'SALE',
+        reference_id: orderId
+      });
     }
   });
   
   return { status: 'success', message: 'Order created', orderId, invoiceNumber };
+}
+
+function processReturnExchangeTransaction(payload) {
+  const { invoice_id, operation_type, total_amount, vat_adjustment, items, payment, created_by } = payload;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. Create Return/Exchange Entry
+  const opId = Utilities.getUuid();
+  const opTargetSheet = ss.getSheetByName(SHEETS.RETURNS_EXCHANGES);
+  opTargetSheet.appendRow([
+    opId,
+    invoice_id,
+    operation_type,
+    total_amount,
+    vat_adjustment,
+    new Date(),
+    created_by || 'system'
+  ]);
+  
+  // 2. Update Invoice Status
+  const ordersSheet = ss.getSheetByName(SHEETS.ORDERS);
+  const orders = ordersSheet.getDataRange().getValues();
+  for(let i=1; i<orders.length; i++) {
+    if(orders[i][0] === invoice_id) {
+      ordersSheet.getRange(i+1, 5).setValue(operation_type === 'RETURN' ? 'returned' : 'exchanged');
+      break;
+    }
+  }
+
+  // 3. Process Items
+  const productSheet = ss.getSheetByName(SHEETS.PRODUCTS);
+  const prodData = productSheet.getDataRange().getValues();
+  const productMap = new Map();
+  for(let i=1; i<prodData.length; i++) productMap.set(String(prodData[i][0]).trim().toLowerCase(), i + 1);
+
+  const opItemsSheet = ss.getSheetByName(SHEETS.RETURN_EXCHANGE_ITEMS);
+  
+  items.forEach(item => {
+    // Save Item Detail
+    opItemsSheet.appendRow([
+      Utilities.getUuid(),
+      opId,
+      item.sku,
+      item.qty,
+      item.price_difference || 0,
+      item.reason || ''
+    ]);
+    
+    // Inventory Adjustment
+    if (item.type === 'RETURNED') {
+      // Stock IN
+      const rowIndex = productMap.get(String(item.sku).trim().toLowerCase());
+      if(rowIndex) {
+        const currentStock = Number(prodData[rowIndex-1][5]) || 0;
+        productSheet.getRange(rowIndex, 6).setValue(currentStock + item.qty);
+        
+        // Stock Movement
+        addRow(SHEETS.STOCK_MOVEMENTS, {
+          sku: item.sku,
+          qty: item.qty,
+          movement_type: 'IN',
+          reference_type: operation_type,
+          reference_id: opId
+        });
+      }
+    } else if (item.type === 'NEW') {
+      // Stock OUT
+      const rowIndex = productMap.get(String(item.sku).trim().toLowerCase());
+      if(rowIndex) {
+        const currentStock = Number(prodData[rowIndex-1][5]) || 0;
+        productSheet.getRange(rowIndex, 6).setValue(currentStock - item.qty);
+        
+        // Stock Movement
+        addRow(SHEETS.STOCK_MOVEMENTS, {
+          sku: item.sku,
+          qty: item.qty,
+          movement_type: 'OUT',
+          reference_type: operation_type,
+          reference_id: opId
+        });
+      }
+    }
+  });
+  
+  // 4. Payment Adjustment
+  if (payment) {
+    addRow(SHEETS.PAYMENTS_ADJUSTMENTS, {
+      operation_id: opId,
+      amount: payment.amount,
+      method: payment.method,
+      direction: payment.direction
+    });
+  }
+  
+  return { status: 'success', message: 'Operation processed successfully', operationId: opId };
 }
 
 function updateUser(data) {
@@ -329,6 +552,8 @@ function getReportsData() {
   for(let i=1; i<orders.length; i++) {
     const date = new Date(orders[i][5]);
     const amount = Number(orders[i][3]) || 0;
+    if (orders[i][4] === 'returned') continue; // Skip returned orders in reports
+    
     totalSales += amount;
     if(date >= startOfMonth) monthlySales += amount;
     const dStr = date.toISOString().split('T')[0];
@@ -337,8 +562,8 @@ function getReportsData() {
   
   for(let i=1; i<items.length; i++) {
     const pid = String(items[i][2]);
-    const qty = Number(items[i][3]) || 0;
-    const price = Number(items[i][4]) || 0;
+    const qty = Number(items[i][5]) || 0;
+    const price = Number(items[i][6]) || 0;
     const info = prodInfo[pid] || { name: 'Unknown', cat: 'Other' };
     productSales[info.name] = (productSales[info.name] || 0) + qty;
     categorySales[info.cat] = (categorySales[info.cat] || 0) + (qty * price);

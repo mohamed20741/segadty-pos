@@ -12,7 +12,8 @@ import {
     Users,
     LogOut,
     Store,
-    Database
+    Database,
+    RotateCcw
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
@@ -20,6 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 const menuItems = [
     { href: "/dashboard", label: "الرئيسية", icon: LayoutDashboard, roles: ['admin', 'manager', 'cashier'] },
     { href: "/pos", label: "نقطة البيع", icon: ShoppingCart, roles: ['admin', 'manager', 'cashier'] },
+    { href: "/returns", label: "المرتجعات والتبديل", icon: RotateCcw, roles: ['admin', 'manager', 'cashier'] },
     { href: "/inventory", label: "المخزون", icon: Package, roles: ['admin', 'manager'] },
     { href: "/reports", label: "التقارير", icon: BarChart3, roles: ['admin', 'manager'] },
     { href: "/branches", label: "الفروع", icon: Store, roles: ['admin'] },
