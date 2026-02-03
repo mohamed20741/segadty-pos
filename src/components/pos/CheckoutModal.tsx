@@ -293,8 +293,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     <div class="invoice-page">
                         <div class="header-section">
                             <div class="company-info">
-                                <div class="company-name">سجادة صلاتي للتجارة</div>
-                                <div class="company-sub">Segadty Trading Co.</div>
+                                <div class="company-name">شركة نعمة سجادتي التجارية</div>
+                                <!-- <div class="company-sub">Segadty Trading Co.</div> -->
                                 <div class="invoice-title">فاتورة ضريبية مبسطة</div>
                             </div>
                         </div>
@@ -386,11 +386,11 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     
                         <div class="footer">
                             <div class="footer-right">
-                                <div>عنوان التاجر: المملكة العربية السعودية</div>
+                                <div>عنوان التاجر: المملكة العربية السعودية، الرياض، الملك عبدالعزيز، طريق صلاح الدين الأيوبي</div>
                                 <div>تم اصدار الفاتورة من نظام Segadty POS</div>
                             </div>
                             <div class="footer-left">
-                               <div>الرقم الضريبي: 300000000000003</div>
+                               <div>الرقم الضريبي: 312762602300003</div>
                             </div>
                         </div>
                     </div>
