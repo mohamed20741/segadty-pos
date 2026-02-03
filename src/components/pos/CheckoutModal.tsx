@@ -341,26 +341,34 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 </div>
             </div>
 
-            {/* Premium Print Styles */}
+            {/* Professional Print Styles */}
             <style jsx global>{`
         @media print {
-            body {
-                background: white;
+            /* Hide everything by default */
+            body * {
+                visibility: hidden;
                 margin: 0;
-                padding: 0;
             }
-            body > *:not(#printable-invoice-container) {
-                display: none !important;
-            }
-            #printable-invoice-container {
-                display: block !important;
-                width: 100%;
-                height: 100%;
-            }
-            #printable-invoice {
-                display: block !important;
+            /* Show only the printable invoice and its children */
+            #printable-invoice, #printable-invoice * {
                 visibility: visible !important;
+            }
+            /* Position the invoice to start from the top-left */
+            #printable-invoice {
+                position: absolute;
+                left: 0;
+                top: 0;
                 width: 100%;
+                margin: 0;
+                padding: 40px;
+                display: block !important;
+                background: white;
+            }
+            /* Disable any background colors that might interfere if needed, 
+               but keep the invoice clean */
+             @page {
+                size: auto;
+                margin: 0mm;
             }
         }
       `}</style>

@@ -20,7 +20,7 @@ import {
 
 import { updateUserInSheet, deleteUserFromSheet } from "@/lib/google-sheets";
 
-const VERSION = "1.2.0"; // للتأكد من تحديث النسخة لدى المستخدم
+const VERSION = "1.5.0"; // النسخة الأحدث مع تحسينات الصلاحيات والمظهر
 
 export default function UsersPage() {
     const [users, setUsers] = useState<User[]>([]);
@@ -110,7 +110,23 @@ export default function UsersPage() {
     const isUserActive = (status: any) => {
         if (!status) return false;
         const s = status.toString().trim().toLowerCase();
+        // ندعم القيم العربية والإنجليزية ومختلف الحالات
         return s === 'active' || s === 'نشط' || s === '1' || s === 'true' || s === 'yes' || s === 'active ';
+    };
+
+    const getBranchName = (branchId: string) => {
+        if (!branchId || branchId === "" || branchId === "null") return "صلاحية عامة (كل الفروع)";
+        const branch = branches.find(b => String(b.id) === String(branchId));
+        return branch ? branch.name : `فرع (${branchId})`;
+    };
+
+    const getRoleLabel = (role: string) => {
+        const roles: any = {
+            admin: "مدير نظام",
+            manager: "مدير فرع",
+            cashier: "كاشير"
+        };
+        return roles[role?.toLowerCase()] || role;
     };
 
     return (
@@ -192,9 +208,7 @@ export default function UsersPage() {
                     <table className="w-full text-right">
                         <thead>
                             <tr className="bg-gray-50/50 text-gray-500 text-sm font-bold uppercase tracking-wider">
-                                <th className="px-6 py-4">الاسم</th>
-                                <th className="px-6 py-4">اسم المستخدم</th>
-                                <th className="px-6 py-4">الدور</th>
+                                <th className="px-6 py-4">المستخدم</th>
                                 <th className="px-6 py-4">الفرع</th>
                                 <th className="px-6 py-4">الحالة</th>
                                 <th className="px-6 py-4 text-center">الإجراءات</th>
@@ -220,19 +234,21 @@ export default function UsersPage() {
                             ) : (
                                 filteredUsers.map((user) => (
                                     <tr key={user.id} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-4 font-bold text-gray-800">{user.name}</td>
-                                        <td className="px-6 py-4 font-mono text-sm text-gray-600">{user.username}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${user.role === 'admin' ? 'bg-purple-50 text-purple-600' :
-                                                user.role === 'manager' ? 'bg-blue-50 text-blue-600' :
-                                                    'bg-green-50 text-green-600'
-                                                }`}>
-                                                {user.role === 'admin' ? 'مدير نظام' :
-                                                    user.role === 'manager' ? 'مدير فرع' : 'كاشير'}
-                                            </span>
+                                        <td className="py-6 px-4">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                    {getRoleLabel(user.role)}
+                                                </span>
+                                                <span className="font-black text-gray-800">{user.name}</span>
+                                            </div>
+                                            <p className="text-xs text-gray-400">@{user.username}</p>
                                         </td>
-                                        <td className="px-6 py-4 text-gray-600">
-                                            {branches.find(b => b.id === user.branch_id)?.name || 'كل الفروع'}
+                                        <td className="py-6 px-4">
+                                            <div className="flex flex-col">
+                                                <span className={`text-[11px] font-bold ${!user.branch_id ? 'text-primary' : 'text-gray-600'}`}>
+                                                    {getBranchName(user.branch_id)}
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <button
