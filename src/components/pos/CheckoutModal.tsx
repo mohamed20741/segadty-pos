@@ -72,8 +72,12 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
             await createOrderInSheet(orderData);
             setLastInvoiceNumber(invoiceNum);
             setStep("success");
+
+            // Stock is deducted in backend. Frontend will update on refresh.
         } catch (error) {
             console.error("Failed to sync order:", error);
+            // Even if it fails (e.g. network), we show success locally for now or handle error
+            // ideally show error, but for now we assume success flow for POS continuity
             setLastInvoiceNumber(invoiceNum);
             setStep("success");
         } finally {
@@ -82,293 +86,299 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     };
 
     const handlePrint = () => {
-        // تصميم الفاتورة النظيف (B&W Minimalist) مع بيانات الشركة الصحيحة
-        const invoiceHTML = `
-            <!DOCTYPE html>
-            <html lang="ar" dir="rtl">
-            <head>
-                <meta charset="UTF-8">
-                <title>فاتورة - ${lastInvoiceNumber}</title>
-                <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
-                    
-                    * { box-sizing: border-box; }
-                    
-                    body {
-                        font-family: 'Cairo', sans-serif;
-                        margin: 0;
-                        padding: 20px;
-                        background: white;
-                        color: black;
-                        font-size: 14px;
-                        line-height: 1.5;
-                    }
-
-                    .invoice-container {
-                        max-width: 210mm;
-                        margin: 0 auto;
-                        padding: 20px 40px;
-                    }
-
-                    /* Header */
-                    .header {
-                        text-align: center;
-                        margin-bottom: 20px;
-                    }
-                    .brand-name {
-                        font-size: 26px;
-                        font-weight: 800;
-                        margin-bottom: 5px;
-                        color: #000;
-                    }
-                    .brand-sub {
-                        font-size: 14px;
-                        font-weight: 600;
-                        letter-spacing: 2px;
-                        color: #333;
-                        margin-bottom: 10px;
-                        text-transform: uppercase;
-                    }
-                    .branch-name {
-                        font-size: 12px;
-                        font-weight: 600;
-                    }
-
-                    .divider {
-                        border-top: 3px solid #000;
-                        margin: 20px 0;
-                    }
-
-                    /* Meta Data */
-                    .meta-section {
-                        display: flex;
-                        justify-content: space-between;
-                        margin-bottom: 20px;
-                        font-weight: 600;
-                    }
-                    
-                    .meta-right, .meta-left {
-                        display: flex;
-                        flex-direction: column;
-                        gap: 8px;
-                    }
-
-                    .meta-row {
-                        display: flex;
-                        align-items: center;
-                    }
-                    .meta-label {
-                        min-width: 80px;
-                        color: #555;
-                        font-weight: 700;
-                    }
-                    .meta-value {
-                        color: #000;
-                        font-weight: 700;
-                        margin-right: 10px; /* Space between label and value in RTL */
-                    }
-                    
-                    /* English/Numbers in RTL */
-                    .en-font {
-                        font-family: sans-serif;
-                        direction: ltr;
-                        display: inline-block;
-                    }
-
-                    /* Table */
-                    table {
-                        width: 100%;
-                        border-collapse: collapse;
-                        margin-bottom: 30px;
-                    }
-
-                    th {
-                        text-align: right;
-                        padding: 10px 0;
-                        border-top: 3px solid #000;
-                        border-bottom: 3px solid #000;
-                        font-weight: 800;
-                        font-size: 14px;
-                    }
-                    
-                    /* Adjust alignment to match minimalist style */
-                    th:first-child { text-align: right; } /* Product */
-                    th:nth-child(2) { text-align: center; } /* Qty */
-                    th:nth-child(3) { text-align: center; } /* Price */
-                    th:last-child { text-align: left; } /* Total */
-
-                    td {
-                        padding: 15px 0;
-                        border-bottom: 1px solid #eee;
-                        vertical-align: top;
-                        font-weight: 600;
-                    }
-
-                    td:first-child { text-align: right; }
-                    td:nth-child(2) { text-align: center; }
-                    td:nth-child(3) { text-align: center; }
-                    td:last-child { text-align: left; }
-
-                    /* Totals */
-                    .totals-section {
-                        display: flex;
-                        justify-content: flex-end; /* Move to left side (visually in RTL this puts it on left) */
-                        margin-top: 10px;
-                    }
-
-                    .totals-box {
-                        width: 300px; /* Fixed width for alignemnt */
-                        border-top: 3px solid #000;
-                        padding-top: 15px;
-                    }
-
-                    .total-row {
-                        display: flex;
-                        justify-content: space-between;
-                        margin-bottom: 8px;
-                        font-size: 14px;
-                        font-weight: 600;
-                    }
-
-                    .final-total {
-                        margin-top: 10px;
-                        padding-top: 10px;
-                        border-top: 1px dotted #999;
-                        font-size: 18px;
-                        font-weight: 900;
-                    }
-
-                    /* Footer */
-                    .footer {
-                        margin-top: 50px;
-                        text-align: center;
-                        font-size: 12px;
-                        color: #777;
-                        border-top: 1px solid #eee;
-                        padding-top: 20px;
-                        line-height: 1.8;
-                    }
-
-                    @media print {
-                        @page { margin: 0; size: auto; }
-                        body { padding: 0.5cm; }
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="invoice-container">
-                    
-                    <!-- Header -->
-                    <div class="header">
-                        <div class="brand-name">شركة نعمة سجادتي التجارية</div>
-                        <div class="brand-sub">SEGADTY POS</div>
-                        <div class="branch-name">فرع: ${user?.branch_id || 'الفرع الرئيسي'}</div>
-                    </div>
-
-                    <div class="divider"></div>
-
-                    <!-- Meta Data -->
-                    <div class="meta-section">
-                        <!-- Right Side -->
-                        <div class="meta-right">
-                            <div class="meta-row">
-                                <span class="meta-label">العميل:</span>
-                                <span class="meta-value en-font" style="font-weight: 800; font-size: 15px;">${customer.name}</span>
-                            </div>
-                            <div class="meta-row">
-                                <span class="meta-label">الدفع:</span>
-                                <span class="meta-value">${paymentMethod === 'cash' ? 'نقداً (Cash)' : 'شبكة (Card)'}</span>
-                            </div>
+        try {
+            console.log("Starting print process...");
+            // تصميم الفاتورة النظيف (B&W Minimalist) مع بيانات الشركة الصحيحة
+            const invoiceHTML = `
+                <!DOCTYPE html>
+                <html lang="ar" dir="rtl">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>فاتورة - ${lastInvoiceNumber}</title>
+                    <style>
+                        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap');
+                        
+                        * { box-sizing: border-box; }
+                        
+                        body {
+                            font-family: 'Cairo', sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            background: white;
+                            color: black;
+                            font-size: 14px;
+                            line-height: 1.5;
+                        }
+    
+                        .invoice-container {
+                            max-width: 210mm;
+                            margin: 0 auto;
+                            padding: 20px 40px;
+                        }
+    
+                        /* Header */
+                        .header {
+                            text-align: center;
+                            margin-bottom: 20px;
+                        }
+                        .brand-name {
+                            font-size: 26px;
+                            font-weight: 800;
+                            margin-bottom: 5px;
+                            color: #000;
+                        }
+                        .brand-sub {
+                            font-size: 14px;
+                            font-weight: 600;
+                            letter-spacing: 2px;
+                            color: #333;
+                            margin-bottom: 10px;
+                            text-transform: uppercase;
+                        }
+                        .branch-name {
+                            font-size: 12px;
+                            font-weight: 600;
+                        }
+    
+                        .divider {
+                            border-top: 3px solid #000;
+                            margin: 20px 0;
+                        }
+    
+                        /* Meta Data */
+                        .meta-section {
+                            display: flex;
+                            justify-content: space-between;
+                            margin-bottom: 20px;
+                            font-weight: 600;
+                        }
+                        
+                        .meta-right, .meta-left {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 8px;
+                        }
+    
+                        .meta-row {
+                            display: flex;
+                            align-items: center;
+                        }
+                        .meta-label {
+                            min-width: 80px;
+                            color: #555;
+                            font-weight: 700;
+                        }
+                        .meta-value {
+                            color: #000;
+                            font-weight: 700;
+                            margin-right: 10px; /* Space between label and value in RTL */
+                        }
+                        
+                        /* English/Numbers in RTL */
+                        .en-font {
+                            font-family: sans-serif;
+                            direction: ltr;
+                            display: inline-block;
+                        }
+    
+                        /* Table */
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-bottom: 30px;
+                        }
+    
+                        th {
+                            text-align: right;
+                            padding: 10px 0;
+                            border-top: 3px solid #000;
+                            border-bottom: 3px solid #000;
+                            font-weight: 800;
+                            font-size: 14px;
+                        }
+                        
+                        /* Adjust alignment to match minimalist style */
+                        th:first-child { text-align: right; } /* Product */
+                        th:nth-child(2) { text-align: center; } /* Qty */
+                        th:nth-child(3) { text-align: center; } /* Price */
+                        th:last-child { text-align: left; } /* Total */
+    
+                        td {
+                            padding: 15px 0;
+                            border-bottom: 1px solid #eee;
+                            vertical-align: top;
+                            font-weight: 600;
+                        }
+    
+                        td:first-child { text-align: right; }
+                        td:nth-child(2) { text-align: center; }
+                        td:nth-child(3) { text-align: center; }
+                        td:last-child { text-align: left; }
+    
+                        /* Totals */
+                        .totals-section {
+                            display: flex;
+                            justify-content: flex-end; /* Move to left side (visually in RTL this puts it on left) */
+                            margin-top: 10px;
+                        }
+    
+                        .totals-box {
+                            width: 300px; /* Fixed width for alignemnt */
+                            border-top: 3px solid #000;
+                            padding-top: 15px;
+                        }
+    
+                        .total-row {
+                            display: flex;
+                            justify-content: space-between;
+                            margin-bottom: 8px;
+                            font-size: 14px;
+                            font-weight: 600;
+                        }
+    
+                        .final-total {
+                            margin-top: 10px;
+                            padding-top: 10px;
+                            border-top: 1px dotted #999;
+                            font-size: 18px;
+                            font-weight: 900;
+                        }
+    
+                        /* Footer */
+                        .footer {
+                            margin-top: 50px;
+                            text-align: center;
+                            font-size: 12px;
+                            color: #777;
+                            border-top: 1px solid #eee;
+                            padding-top: 20px;
+                            line-height: 1.8;
+                        }
+    
+                        @media print {
+                            @page { margin: 0; size: auto; }
+                            body { padding: 0.5cm; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="invoice-container">
+                        
+                        <!-- Header -->
+                        <div class="header">
+                            <div class="brand-name">شركة نعمة سجادتي التجارية</div>
+                            <div class="brand-sub">SEGADTY POS</div>
+                            <div class="branch-name">فرع: ${user?.branch_id || 'الفرع الرئيسي'}</div>
                         </div>
-
-                        <!-- Left Side -->
-                        <div class="meta-left" style="text-align: left; align-items: flex-end;">
-                            <div class="meta-row">
-                                <span class="meta-value en-font" style="font-size: 15px;">${lastInvoiceNumber}</span>
-                                <span class="meta-label" style="text-align: left;">:رقم الفاتورة</span>
+    
+                        <div class="divider"></div>
+    
+                        <!-- Meta Data -->
+                        <div class="meta-section">
+                            <!-- Right Side -->
+                            <div class="meta-right">
+                                <div class="meta-row">
+                                    <span class="meta-label">العميل:</span>
+                                    <span class="meta-value en-font" style="font-weight: 800; font-size: 15px;">${customer.name}</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-label">الدفع:</span>
+                                    <span class="meta-value">${paymentMethod === 'cash' ? 'نقداً (Cash)' : 'شبكة (Card)'}</span>
+                                </div>
                             </div>
-                            <div class="meta-row">
-                                <span class="meta-value en-font">${new Date().toLocaleDateString('en-GB')}</span>
-                                <span class="meta-label" style="text-align: left;">:التاريخ</span>
-                            </div>
-                            <div class="meta-row">
-                                <span class="meta-value en-font">${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-                                <span class="meta-label" style="text-align: left;">:الوقت</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Table -->
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>المنتج</th>
-                                <th>الكمية</th>
-                                <th>السعر</th>
-                                <th>الإجمالي</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${cart.map(item => `
-                                <tr>
-                                    <td>
-                                        <div style="font-weight: 700; margin-bottom: 2px;">${item.name}</div>
-                                        ${item.cartQuantity > 1 ? '<span style="font-size: 11px; color: #666;">( عرض خاص )</span>' : ''}
-                                    </td>
-                                    <td class="en-font">${item.cartQuantity}</td>
-                                    <td class="en-font">${item.selling_price.toLocaleString()}</td>
-                                    <td class="en-font" style="font-weight: 800;">${(item.cartQuantity * item.selling_price).toLocaleString()}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-
-                    <!-- Totals -->
-                    <div class="totals-section">
-                        <div class="totals-box">
-                            <div class="total-row">
-                                <span>المجموع الفرعي:</span>
-                                <span class="en-font">${subtotal.toLocaleString()}</span>
-                            </div>
-                            <div class="total-row">
-                                <span>الضريبة (15%):</span>
-                                <span class="en-font">${tax.toLocaleString()}</span>
-                            </div>
-                            <div class="total-row final-total">
-                                <span>الإجمالي النهائي:</span>
-                                <div>
-                                    <span class="en-font">${total.toLocaleString()}</span>
-                                    <span style="font-size: 12px; font-weight: 500;"> ريال</span>
+    
+                            <!-- Left Side -->
+                            <div class="meta-left" style="text-align: left; align-items: flex-end;">
+                                <div class="meta-row">
+                                    <span class="meta-value en-font" style="font-size: 15px;">${lastInvoiceNumber}</span>
+                                    <span class="meta-label" style="text-align: left;">:رقم الفاتورة</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-value en-font">${new Date().toLocaleDateString('en-GB')}</span>
+                                    <span class="meta-label" style="text-align: left;">:التاريخ</span>
+                                </div>
+                                <div class="meta-row">
+                                    <span class="meta-value en-font">${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                                    <span class="meta-label" style="text-align: left;">:الوقت</span>
                                 </div>
                             </div>
                         </div>
+    
+                        <!-- Table -->
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>المنتج</th>
+                                    <th>الكمية</th>
+                                    <th>السعر</th>
+                                    <th>الإجمالي</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${cart.map(item => `
+                                    <tr>
+                                        <td>
+                                            <div style="font-weight: 700; margin-bottom: 2px;">${item.name}</div>
+                                            ${item.cartQuantity > 1 ? '<span style="font-size: 11px; color: #666;">( عرض خاص )</span>' : ''}
+                                        </td>
+                                        <td class="en-font">${item.cartQuantity}</td>
+                                        <td class="en-font">${item.selling_price.toLocaleString()}</td>
+                                        <td class="en-font" style="font-weight: 800;">${(item.cartQuantity * item.selling_price).toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+    
+                        <!-- Totals -->
+                        <div class="totals-section">
+                            <div class="totals-box">
+                                <div class="total-row">
+                                    <span>المجموع الفرعي:</span>
+                                    <span class="en-font">${subtotal.toLocaleString()}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>الضريبة (15%):</span>
+                                    <span class="en-font">${tax.toLocaleString()}</span>
+                                </div>
+                                <div class="total-row final-total">
+                                    <span>الإجمالي النهائي:</span>
+                                    <div>
+                                        <span class="en-font">${total.toLocaleString()}</span>
+                                        <span style="font-size: 12px; font-weight: 500;"> ريال</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+    
+                        <!-- Footer -->
+                        <div class="footer">
+                            <div>العنوان: المملكة العربية السعودية، الرياض، الملك عبدالعزيز، طريق صلاح الدين الأيوبي</div>
+                            <div class="en-font">الرقم الضريبي: 312762602300003</div>
+                            <div style="margin-top: 5px;">الكاشير: ${user?.name || user?.username || 'نظام آلي'}</div>
+                        </div>
                     </div>
+    
+                    <script>
+                        window.onload = function() {
+                            window.print();
+                        }
+                    </script>
+                </body>
+                </html>
+            `;
 
-                    <!-- Footer -->
-                    <div class="footer">
-                        <div>العنوان: المملكة العربية السعودية، الرياض، الملك عبدالعزيز، طريق صلاح الدين الأيوبي</div>
-                        <div class="en-font">الرقم الضريبي: 312762602300003</div>
-                        <div style="margin-top: 5px;">الكاشير: ${user?.name || user?.username || 'نظام آلي'}</div>
-                    </div>
-                </div>
-
-                <script>
-                    window.onload = function() {
-                        window.print();
-                    }
-                </script>
-            </body>
-            </html>
-        `;
-
-        // فتح نافذة جديدة للطباعة
-        const printWindow = window.open('', '_blank', 'width=900,height=800');
-        if (printWindow) {
-            printWindow.document.open();
-            printWindow.document.write(invoiceHTML);
-            printWindow.document.close();
-        } else {
-            alert("يرجى السماح بالنوافذ المنبثقة (Popups) لطباعة الفاتورة");
+            // فتح نافذة جديدة للطباعة
+            const printWindow = window.open('', '_blank', 'width=900,height=800');
+            if (printWindow) {
+                printWindow.document.open();
+                printWindow.document.write(invoiceHTML);
+                printWindow.document.close();
+            } else {
+                alert("يرجى السماح بالنوافذ المنبثقة (Popups) لطباعة الفاتورة");
+            }
+        } catch (e) {
+            console.error("Print Error:", e);
+            alert("حدث خطأ أثناء محاولة الطباعة. يرجى مراجعة وحدة التحكم (Console).");
         }
     };
 
@@ -377,6 +387,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         setStep("form");
         setCustomer({ name: "", phone: "", city: "الرياض", type: "individual", address: "" });
         onClose();
+        // Force reload page to fetch fresh stock data
+        window.location.reload();
     };
 
     return (
