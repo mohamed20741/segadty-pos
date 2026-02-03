@@ -82,227 +82,304 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     };
 
     const handlePrint = () => {
-        // 1. Prepare the content
+        // إنشاء محتوى الفاتورة بناءً على التصميم المرفق في الصورة
         const invoiceHTML = `
             <!DOCTYPE html>
             <html lang="ar" dir="rtl">
             <head>
                 <meta charset="UTF-8">
-                <title>Invoice #${lastInvoiceNumber}</title>
+                <title>فاتورة ضريبية مبسطة - ${lastInvoiceNumber}</title>
                 <style>
-                    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+                    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+                    
+                    * { box-sizing: border-box; }
+                    
                     body {
                         font-family: 'Cairo', sans-serif;
                         margin: 0;
-                        padding: 20px;
+                        padding: 0;
                         background: white;
                         color: black;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
+                        font-size: 12px;
                     }
-                    .invoice-container {
-                        max-width: 800px;
+
+                    .invoice-page {
+                        max-width: 210mm; /* A4 Width */
                         margin: 0 auto;
-                        border: 1px solid #eee;
-                        padding: 40px;
+                        padding: 20px;
+                        border-top: 10px solid #8B0000; /* Dark Red Border matching image */
                     }
-                    .header {
-                        text-align: center;
-                        border-bottom: 2px solid #000;
-                        padding-bottom: 20px;
-                        margin-bottom: 30px;
-                    }
-                    .title {
-                        font-size: 32px;
-                        font-weight: 900;
-                        margin: 0;
-                        color: #000;
-                    }
-                    .subtitle {
-                        font-size: 14px;
-                        letter-spacing: 4px;
-                        font-weight: bold;
-                        margin: 5px 0 0;
-                        color: #333;
-                        display: block;
-                    }
-                    .meta-grid {
+
+                    .header-section {
                         display: flex;
                         justify-content: space-between;
+                        align-items: flex-start;
                         margin-bottom: 30px;
+                        padding-top: 20px;
                     }
-                    .meta-col {
+
+                    .qr-placeholder {
+                        width: 100px;
+                        height: 100px;
+                        border: 2px solid #000;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: #f0f0f0;
+                        font-weight: bold;
+                        font-size: 10px;
+                    }
+
+                    .company-info {
+                        text-align: center;
                         flex: 1;
                     }
-                    .meta-row {
-                        margin-bottom: 8px;
-                        font-size: 14px;
+
+                    .company-name {
+                        font-size: 18px;
+                        font-weight: 800;
+                        margin-bottom: 5px;
                     }
+
+                    .barcode-section {
+                        text-align: left;
+                    }
+
+                    .barcode-placeholder {
+                        width: 150px;
+                        height: 50px;
+                        background: #000; /* Simulated Barcode */
+                        margin-bottom: 5px;
+                        border-radius: 2px;
+                        background-image: linear-gradient(90deg, #000 50%, transparent 50%);
+                        background-size: 4px 100%;
+                    }
+
+                    .invoice-details-grid {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 20px;
+                    }
+
+                    .right-details, .left-details {
+                        flex: 1;
+                    }
+
+                    .detail-row {
+                        margin-bottom: 4px;
+                        display: flex;
+                        align-items: baseline;
+                    }
+
                     .label {
-                        font-weight: bold;
-                        color: #555;
+                        font-weight: 700;
+                        margin-left: 5px;
                         width: 100px;
-                        display: inline-block;
                     }
+
                     .value {
-                        font-weight: bold;
-                        font-family: monospace;
-                        font-size: 16px;
+                        font-weight: 600;
                     }
+
+                    /* Table Design matching image */
                     table {
                         width: 100%;
                         border-collapse: collapse;
-                        margin-bottom: 30px;
+                        margin-bottom: 20px;
+                        font-size: 11px;
                     }
+
                     th {
-                        background: #f9fafb;
-                        padding: 12px;
-                        text-align: inherit;
-                        border-top: 2px solid #000;
-                        border-bottom: 2px solid #000;
+                        color: #8B0000; /* Red headers */
                         font-weight: 800;
-                        font-size: 14px;
+                        padding: 8px;
+                        text-align: center;
+                        border-bottom: 1px solid #ddd;
+                        background-color: #fcfcfc;
                     }
+
                     td {
-                        padding: 12px;
+                        padding: 10px 8px;
+                        text-align: center;
                         border-bottom: 1px solid #eee;
-                        font-size: 14px;
+                        vertical-align: middle;
                     }
-                    .summary {
-                        display: flex;
-                        justify-content: flex-end;
+
+                    .product-name {
+                        text-align: right;
+                        font-weight: 700;
+                        color: #000;
                     }
-                    .summary-box {
-                        width: 300px;
-                        border-top: 2px solid #000;
-                        padding-top: 10px;
-                    }
-                    .summary-row {
+
+                    /* Totals Section */
+                    .totals-section {
                         display: flex;
                         justify-content: space-between;
-                        margin-bottom: 5px;
-                        font-size: 14px;
+                        margin-top: 20px;
+                        border-top: 2px solid #eee;
+                        padding-top: 20px;
                     }
+
+                    .totals-box {
+                        width: 350px;
+                        margin-right: auto; /* Align to left */
+                    }
+
                     .total-row {
                         display: flex;
                         justify-content: space-between;
-                        margin-top: 10px;
-                        padding-top: 10px;
-                        border-top: 1px dashed #ccc;
-                        font-weight: 900;
-                        font-size: 18px;
+                        margin-bottom: 8px;
+                        padding: 4px 0;
                     }
+
+                    .total-row.final {
+                        border-top: 2px solid #8B0000;
+                        color: #8B0000;
+                        font-weight: 900;
+                        font-size: 16px;
+                        padding-top: 10px;
+                        margin-top: 10px;
+                    }
+
                     .footer {
                         margin-top: 50px;
-                        text-align: center;
-                        font-size: 12px;
-                        color: #666;
-                        border-top: 1px solid #eee;
-                        padding-top: 20px;
+                        border-top: 1px solid #ddd;
+                        padding-top: 10px;
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 10px;
+                        color: #555;
                     }
+
                     @media print {
+                        body { -webkit-print-color-adjust: exact; }
                         .no-print { display: none; }
-                        body { background: white; }
-                        @page { margin: 0; size: auto; }
                     }
                 </style>
             </head>
             <body>
-                <div class="invoice-container">
-                    <div class="header">
-                        <h1 class="title">سجادة صلاتي</h1>
-                        <span class="subtitle">SEGADTY POS</span>
-                        <p style="margin-top: 10px; font-size: 12px; font-weight: bold;">
-                            الفرع: ${user?.branch_id || 'الفرع الرئيسي'}
-                        </p>
+                <div class="invoice-page">
+                    
+                    <!-- Header with QR and Barcode layout -->
+                    <div class="header-section">
+                        <div class="qr-placeholder">
+                            QR Code
+                        </div>
+                        
+                        <div class="company-info">
+                            <div class="company-name">سجادة صلاتي للتجارة</div>
+                            <div>Segadty Trading Co.</div>
+                            <div style="font-weight: bold; margin-top: 10px;">فاتورة ضريبية مبسطة</div>
+                        </div>
+
+                        <div class="barcode-section">
+                            <div class="barcode-placeholder"></div>
+                            <div style="text-align: center; font-family: monospace;">${lastInvoiceNumber}</div>
+                        </div>
                     </div>
 
-                    <div class="meta-grid">
-                        <div class="meta-col">
-                            <div class="meta-row"><span class="label">رقم الفاتورة:</span> <span class="value">${lastInvoiceNumber}</span></div>
-                            <div class="meta-row"><span class="label">التاريخ:</span> <span>${new Date().toLocaleDateString('ar-SA')}</span></div>
-                            <div class="meta-row"><span class="label">الوقت:</span> <span>${new Date().toLocaleTimeString('ar-SA')}</span></div>
+                    <!-- Details Grid -->
+                    <div class="invoice-details-grid">
+                        <div class="right-details">
+                            <div class="detail-row"><span class="label">رقم الفاتورة:</span> <span class="value">${lastInvoiceNumber}</span></div>
+                            <div class="detail-row"><span class="label">تاريخ الطلب:</span> <span class="value">${new Date().toLocaleDateString('en-GB')} | ${new Date().toLocaleTimeString('en-US')}</span></div>
+                            <div class="detail-row"><span class="label">حالة الطلب:</span> <span class="value">مدفوع</span></div>
+                            <br>
+                            <div class="detail-row"><span class="label">اسم العميل:</span> <span class="value">${customer.name}</span></div>
+                            <div class="detail-row"><span class="label">رقم الجوال:</span> <span class="value" dir="ltr">${customer.phone}</span></div>
                         </div>
-                        <div class="meta-col" style="text-align: left;">
-                            <div class="meta-row"><span class="value">${customer.name}</span> <span class="label" style="text-align: right;">:العميل</span> </div>
-                            <div class="meta-row"><span>${paymentMethod === 'cash' ? 'نقداً (Cash)' : 'شبكة (Card)'}</span> <span class="label" style="text-align: right;">:الدفع</span></div>
+
+                        <div class="left-details" style="text-align: left;">
+                            <div class="detail-row" style="justify-content: flex-end;"><span class="value">${paymentMethod === 'cash' ? 'نقداً' : 'بطاقة مدى / ائتمان'}</span> <span class="label" style="text-align: right;">:طريقة الدفع</span></div>
+                            <div class="detail-row" style="justify-content: flex-end;"><span class="value">${user?.branch_id || 'الفرع الرئيسي'}</span> <span class="label" style="text-align: right;">:الفرع</span></div>
                         </div>
                     </div>
 
+                    <!-- Items Table -->
                     <table>
                         <thead>
                             <tr>
-                                <th style="text-align: right;">المنتج</th>
-                                <th style="text-align: center;">الكمية</th>
-                                <th style="text-align: center;">السعر</th>
-                                <th style="text-align: left;">الإجمالي</th>
+                                <th style="width: 5%">#</th>
+                                <th style="width: 40%; text-align: right;">وصف المنتج / Product Name</th>
+                                <th>الكمية<br>Qty</th>
+                                <th>السعر<br>Price</th>
+                                <th>الضريبة (15%)<br>VAT</th>
+                                <th>المجموع<br>Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${cart.map(item => `
+                            ${cart.map((item, index) => {
+            const priceBeforeTax = item.selling_price / 1.15;
+            const itemTax = item.selling_price - priceBeforeTax;
+            const itemTotal = item.cartQuantity * item.selling_price;
+
+            return `
                                 <tr>
-                                    <td style="font-weight: bold;">${item.name}</td>
-                                    <td style="text-align: center; font-family: monospace;">${item.cartQuantity}</td>
-                                    <td style="text-align: center; font-family: monospace;">${item.selling_price.toLocaleString()}</td>
-                                    <td style="text-align: left; font-family: monospace; font-weight: bold;">${(item.cartQuantity * item.selling_price).toLocaleString()}</td>
+                                    <td>${index + 1}</td>
+                                    <td class="product-name">
+                                        <div>${item.name}</div>
+                                        <div style="font-size: 9px; color: #666;">SKU: ${item.id.substring(0, 6)}</div>
+                                    </td>
+                                    <td>${item.cartQuantity}</td>
+                                    <td>${priceBeforeTax.toFixed(2)}</td>
+                                    <td>${itemTax.toFixed(2)}</td>
+                                    <td style="font-weight: bold;">${itemTotal.toFixed(2)} SAR</td>
                                 </tr>
-                            `).join('')}
+                                `;
+        }).join('')}
                         </tbody>
                     </table>
 
-                    <div class="summary">
-                        <div class="summary-box">
-                            <div class="summary-row">
-                                <span>المجموع الفرعي:</span>
-                                <span style="font-family: monospace;">${subtotal.toLocaleString()}</span>
-                            </div>
-                            <div class="summary-row">
-                                <span>الضريبة (15%):</span>
-                                <span style="font-family: monospace;">${tax.toLocaleString()}</span>
-                            </div>
-                            <div class="total-row">
-                                <span>الإجمالي النهائي:</span>
-                                <div>
-                                    <span style="font-family: monospace;">${total.toLocaleString()}</span>
-                                    <span style="font-size: 12px;"> ريال</span>
-                                </div>
-                            </div>
+                    <!-- Totals Section -->
+                    <div class="totals-section">
+                        <div style="flex: 1;">
+                            <!-- Empty Space or Notes -->
+                        </div>
+                        <div class="totals-box">
+                             <div style="color: #8B0000; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">تفاصيل السعر</div>
+                             
+                             <div class="total-row">
+                                 <span>المجموع غير شامل الضريبة</span>
+                                 <span>${(total / 1.15).toFixed(2)} SAR</span>
+                             </div>
+                             <div class="total-row">
+                                 <span>ضريبة القيمة المضافة (15%)</span>
+                                 <span>${(total - (total / 1.15)).toFixed(2)} SAR</span>
+                             </div>
+                             <div class="total-row final">
+                                 <span>المجموع الكلي</span>
+                                 <span>${total.toFixed(2)} SAR</span>
+                             </div>
                         </div>
                     </div>
 
+                    <!-- Footer -->
                     <div class="footer">
-                        <p>الكاشير: ${user?.name || user?.username || 'نظام آلي'}</p>
-                        <p style="font-weight: bold; margin: 10px 0;">شكراً لزيارتكم! نأمل رؤيتكم قريباً</p>
-                        <p>www.segadty.com</p>
+                        <div>عنوان التاجر: المملكة العربية السعودية</div>
+                        <div>الرقم الضريبي: 300000000000003</div>
+                        <div>تم إصدار الفاتورة من نظام Segadty POS</div>
                     </div>
                 </div>
+
+                <script>
+                    window.onload = function() {
+                        window.print();
+                        // Optional: window.close() after print if desired, but blocking it is safer for user to see
+                    }
+                </script>
             </body>
             </html>
         `;
 
-        // 2. Create invisible iframe
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-
-        // 3. Write content
-        const doc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (doc) {
-            doc.open();
-            doc.write(invoiceHTML);
-            doc.close();
+        // فتح نافذة جديدة للطباعة (الحل الأضمن)
+        const printWindow = window.open('', '_blank', 'width=900,height=800');
+        if (printWindow) {
+            printWindow.document.open();
+            printWindow.document.write(invoiceHTML);
+            printWindow.document.close();
+        } else {
+            alert("يرجى السماح بالنوافذ المنبثقة (Popups) لطباعة الفاتورة");
         }
-
-        // 4. Print with delay to ensure styles load
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-
-            // Clean up
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-            }, 1000);
-        }, 500);
     };
 
     const handleNewOrder = () => {
