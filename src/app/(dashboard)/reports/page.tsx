@@ -14,7 +14,7 @@ import {
     Search
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SHEET_URL } from "@/lib/google-sheets";
+import { getReportsData } from "@/lib/google-sheets";
 import { cn } from "@/lib/utils";
 
 interface ReportsData {
@@ -32,16 +32,14 @@ export default function ReportsPage() {
     const [error, setError] = useState<string | null>(null);
 
     const fetchReports = async () => {
-        if (!SHEET_URL) return;
         setIsLoading(true);
         setError(null);
         try {
-            const res = await fetch(`${SHEET_URL}?action=getReportsData`);
-            const json = await res.json();
-            if (json.status === 'success') {
-                setData(json.data);
+            const reports = await getReportsData();
+            if (reports) {
+                setData(reports);
             } else {
-                setError(json.message || "Failed to fetch data");
+                setError("لم نتمكن من جلب بيانات التقارير");
             }
         } catch (e) {
             console.error(e);

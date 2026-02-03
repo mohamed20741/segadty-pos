@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,6 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function InventoryPage() {
+    const { user } = useAuth();
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -38,7 +40,8 @@ export default function InventoryPage() {
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [currentProduct, setCurrentProduct] = useState<Partial<Product>>({});
     const [isSaving, setIsSaving] = useState(false);
-    const [viewMode, setViewMode] = useState<"list" | "feeding">("list");
+    const [viewMode, setViewMode] = useState<"list" | "feeding" | "dashboard">("list");
+    const [inventoryStats, setInventoryStats] = useState<any>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -50,6 +53,13 @@ export default function InventoryPage() {
         setIsLoading(true);
         const data = await getProductsFromSheet();
         if (data) setProducts(data);
+
+        // Also fetch stats if we are moving to dashboard or on mount
+        const { getInventoryStats } = await import("@/lib/google-sheets");
+        const branchId = user?.role === 'admin' ? undefined : user?.branch_id;
+        const stats = await getInventoryStats(branchId);
+        if (stats) setInventoryStats(stats);
+
         setIsLoading(false);
     };
 
@@ -184,10 +194,17 @@ export default function InventoryPage() {
 
                 <div className="flex bg-white p-1 rounded-2xl border border-gray-100 shadow-sm">
                     <button
+                        onClick={() => setViewMode("dashboard")}
+                        className={cn("flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all", viewMode === 'dashboard' ? "bg-primary text-white shadow-lg" : "text-gray-500 hover:bg-gray-50")}
+                    >
+                        <LayoutGrid className="w-4 h-4" />
+                        لوحة التحكم
+                    </button>
+                    <button
                         onClick={() => setViewMode("list")}
                         className={cn("flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all", viewMode === 'list' ? "bg-primary text-white shadow-lg" : "text-gray-500 hover:bg-gray-50")}
                     >
-                        <LayoutGrid className="w-4 h-4" />
+                        <Package className="w-4 h-4" />
                         قائمة المخزون
                     </button>
                     <button
@@ -195,20 +212,38 @@ export default function InventoryPage() {
                         className={cn("flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all", viewMode === 'feeding' ? "bg-primary text-white shadow-lg" : "text-gray-500 hover:bg-gray-50")}
                     >
                         <Truck className="w-4 h-4" />
-                        قائمة التغذية (التوريد)
+                        قائمة التغذية
                     </button>
                 </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
                     <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600">
                         <Package className="w-7 h-7" />
                     </div>
                     <div>
-                        <p className="text-sm text-gray-500 font-bold">إجمالي المنتجات</p>
-                        <p className="text-2xl font-black text-gray-800">{products.length}</p>
+                        <p className="text-sm text-gray-500 font-bold">إجمالي المخزون</p>
+                        <p className="text-2xl font-black text-gray-800">{inventoryStats?.warehouseBalance || products.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0)}</p>
+                    </div>
+                </div>
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
+                    <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center text-green-600">
+                        <CheckCircle className="w-7 h-7" />
+                    </div>
+                    <div>
+                        <p className="text-sm text-gray-500 font-bold">المتوفر حالياً</p>
+                        <p className="text-2xl font-black text-gray-800">{inventoryStats?.availableBalance || products.reduce((acc, p) => acc + (Number(p.quantity) || 0), 0)}</p>
+                    </div>
+                </div>
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
+                    <div className="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600">
+                        <Truck className="w-7 h-7" />
+                    </div>
+                    <div>
+                        <p className="text-sm text-gray-500 font-bold">الرصيد المباع</p>
+                        <p className="text-2xl font-black text-gray-800">{inventoryStats?.soldBalance || 0}</p>
                     </div>
                 </div>
                 <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
@@ -216,22 +251,73 @@ export default function InventoryPage() {
                         <AlertTriangle className="w-7 h-7" />
                     </div>
                     <div>
-                        <p className="text-sm text-gray-500 font-bold">تنبيهات انخفاض</p>
-                        <p className="text-2xl font-black text-gray-800">{lowStockItems} منتجات</p>
-                    </div>
-                </div>
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
-                    <div className="w-14 h-14 bg-green-50 rounded-2xl flex items-center justify-center text-green-600">
-                        <RefreshCw className="w-7 h-7" />
-                    </div>
-                    <div>
-                        <p className="text-sm text-gray-500 font-bold">قيمة المخزون</p>
-                        <p className="text-2xl font-black text-gray-800 font-sans">{totalValue.toLocaleString()} ر.س</p>
+                        <p className="text-sm text-gray-500 font-bold">المسترجع</p>
+                        <p className="text-2xl font-black text-gray-800">{inventoryStats?.returnedBalance || 0}</p>
                     </div>
                 </div>
             </div>
 
-            {viewMode === "list" ? (
+            {viewMode === "dashboard" ? (
+                <div className="space-y-8 animate-in fade-in duration-500">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
+                            <h3 className="text-xl font-black text-gray-800 mb-6 flex items-center gap-2">
+                                <span className="w-2 h-8 bg-primary rounded-full"></span>
+                                تحليل المخزون (Inventory Analysis)
+                            </h3>
+                            <div className="space-y-6">
+                                <div className="p-5 bg-gray-50 rounded-2xl flex justify-between items-center group hover:bg-primary/[0.03] transition-colors cursor-default">
+                                    <span className="text-gray-500 font-bold">رصيد المستودع (الإجمالي)</span>
+                                    <span className="text-2xl font-black text-gray-800">{inventoryStats?.warehouseBalance || 0} وحدة</span>
+                                </div>
+                                <div className="p-5 bg-green-50/50 rounded-2xl flex justify-between items-center group hover:bg-green-50 transition-colors cursor-default">
+                                    <span className="text-green-700 font-bold">الرصيد المتوفر للبيع</span>
+                                    <span className="text-2xl font-black text-green-700">{inventoryStats?.availableBalance || 0} وحدة</span>
+                                </div>
+                                <div className="p-5 bg-amber-50/50 rounded-2xl flex justify-between items-center group hover:bg-amber-50 transition-colors cursor-default">
+                                    <span className="text-amber-700 font-bold">إجمالي المبيعات (وحدات)</span>
+                                    <span className="text-2xl font-black text-amber-700">{inventoryStats?.soldBalance || 0} وحدة</span>
+                                </div>
+                                <div className="p-5 bg-red-50/50 rounded-2xl flex justify-between items-center group hover:bg-red-50 transition-colors cursor-default">
+                                    <span className="text-red-700 font-bold">إجمالي المرتجعات</span>
+                                    <span className="text-2xl font-black text-red-700">{inventoryStats?.returnedBalance || 0} وحدة</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-xl">
+                            <h3 className="text-xl font-black text-gray-800 mb-6 flex items-center gap-2">
+                                <span className="w-2 h-8 bg-blue-500 rounded-full"></span>
+                                تنبيهات المخزون المنخفض
+                            </h3>
+                            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                {products.filter(p => (Number(p.quantity) || 0) <= (Number(p.min_quantity) || 5)).map(p => (
+                                    <div key={p.id} className="flex items-center justify-between p-4 border border-red-100 bg-red-50/30 rounded-2xl animate-pulse">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600 font-bold">
+                                                {p.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-gray-800 text-sm">{p.name}</p>
+                                                <p className="text-[10px] text-red-500">الكمية الحالية: {p.quantity}</p>
+                                            </div>
+                                        </div>
+                                        <Button size="sm" variant="outline" onClick={() => { setCurrentProduct(p); setIsEditModalOpen(true); }} className="h-9 border-red-200 text-red-600 hover:bg-red-50">
+                                            تغذية
+                                        </Button>
+                                    </div>
+                                ))}
+                                {products.filter(p => (Number(p.quantity) || 0) <= (Number(p.min_quantity) || 5)).length === 0 && (
+                                    <div className="h-full flex flex-col items-center justify-center py-20 text-gray-400">
+                                        <CheckCircle className="w-12 h-12 mb-2 text-green-400 opacity-20" />
+                                        <p className="font-bold">لا توجد تنبيهات حالياً</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : viewMode === "list" ? (
                 <>
                     {/* Controls */}
                     <div className="bg-white/80 backdrop-blur-md p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col lg:flex-row gap-4 items-center sticky top-4 z-20">

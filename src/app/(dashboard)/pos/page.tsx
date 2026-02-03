@@ -58,10 +58,10 @@ function POSContent() {
 
                         <Link
                             href="/returns"
-                            className="hidden sm:flex items-center gap-2 px-6 h-14 bg-amber-600/10 text-amber-700 rounded-2xl font-bold hover:bg-amber-600/20 transition-all border border-amber-600/20"
+                            className="flex items-center gap-2 px-4 md:px-6 h-12 md:h-14 bg-amber-600/10 text-amber-700 rounded-2xl font-bold hover:bg-amber-600/20 transition-all border border-amber-600/20 shadow-sm whitespace-nowrap"
                         >
                             <RotateCcw className="w-5 h-5" />
-                            <span>مرتجع</span>
+                            <span className="text-sm md:text-base">مرتجع / تبديل</span>
                         </Link>
                     </div>
 

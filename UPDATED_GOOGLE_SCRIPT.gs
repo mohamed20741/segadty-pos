@@ -21,12 +21,12 @@ const SHEETS = {
 const HEADERS = {
   [SHEETS.PRODUCTS]: ['id', 'name', 'category', 'cost_price', 'selling_price', 'stock', 'min_quantity', 'image', 'created_at'],
   [SHEETS.CUSTOMERS]: ['id', 'name', 'phone', 'city', 'type', 'created_at'],
-  [SHEETS.ORDERS]: ['id', 'invoice_number', 'customer_id', 'total_amount', 'status', 'created_at'],
+  [SHEETS.ORDERS]: ['id', 'invoice_number', 'customer_id', 'total_amount', 'status', 'created_at', 'branch_id', 'created_by'],
   [SHEETS.ORDER_ITEMS]: ['id', 'order_id', 'product_id', 'sku', 'product_name', 'quantity', 'unit_price', 'subtotal', 'vat'],
   [SHEETS.USERS]: ['id', 'username', 'name', 'role', 'password', 'branch_id', 'status', 'created_at'],
   [SHEETS.BRANCHES]: ['id', 'name', 'location', 'phone', 'is_active', 'created_at'],
   [SHEETS.LOGS]: ['timestamp', 'action', 'entity', 'entity_id', 'details', 'status'],
-  [SHEETS.RETURNS_EXCHANGES]: ['id', 'invoice_id', 'operation_type', 'total_amount', 'vat_adjustment', 'created_at', 'created_by'],
+  [SHEETS.RETURNS_EXCHANGES]: ['id', 'invoice_id', 'operation_type', 'total_amount', 'vat_adjustment', 'created_at', 'created_by', 'branch_id'],
   [SHEETS.RETURN_EXCHANGE_ITEMS]: ['id', 'operation_id', 'sku', 'qty', 'price_difference', 'reason'],
   [SHEETS.STOCK_MOVEMENTS]: ['id', 'sku', 'qty', 'movement_type', 'reference_type', 'reference_id', 'created_at'],
   [SHEETS.PAYMENTS_ADJUSTMENTS]: ['id', 'operation_id', 'amount', 'method', 'direction']
@@ -82,7 +82,9 @@ function doGet(e) {
     case 'getBranches': response = getTableData(SHEETS.BRANCHES); break;
     case 'getOrders': response = getTableData(SHEETS.ORDERS); break;
     case 'getLogs': response = getTableData(SHEETS.LOGS); break;
-    case 'getReportsData': response = getReportsData(); break;
+    case 'getReportsData': response = getReportsData(e.parameter.branchId, e.parameter.startDate, e.parameter.endDate); break;
+    case 'getInventoryStats': response = getInventoryStats(e.parameter.branchId); break;
+    case 'getCashierPerformance': response = getCashierPerformance(e.parameter.branchId, e.parameter.startDate, e.parameter.endDate); break;
     case 'searchInvoice': response = searchInvoice(e.parameter.query); break;
     case 'getInvoiceDetails': response = getInvoiceDetails(e.parameter.invoiceId); break;
     case 'setup': response = setupDatabase(); break;
@@ -379,7 +381,16 @@ function createOrderTransaction(payload) {
   }
   
   const orderId = Utilities.getUuid();
-  ss.getSheetByName(SHEETS.ORDERS).appendRow([orderId, invoiceNumber, customerId, total, 'completed', new Date()]);
+  ss.getSheetByName(SHEETS.ORDERS).appendRow([
+    orderId, 
+    invoiceNumber, 
+    customerId, 
+    total, 
+    'completed', 
+    new Date(), 
+    payload.branch_id || '', 
+    payload.created_by || ''
+  ]);
   
   const orderItemsSheet = ss.getSheetByName(SHEETS.ORDER_ITEMS);
   items.forEach(item => {
@@ -531,7 +542,7 @@ function updateUser(data) {
   return { status: 'error', message: 'User not found' };
 }
 
-function getReportsData() {
+function getReportsData(branchId, startDate, endDate) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const orders = ss.getSheetByName(SHEETS.ORDERS).getDataRange().getValues();
   const items = ss.getSheetByName(SHEETS.ORDER_ITEMS).getDataRange().getValues();
@@ -539,34 +550,59 @@ function getReportsData() {
   
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const start = startDate ? new Date(startDate) : null;
+  const end = endDate ? new Date(endDate) : null;
   
   let totalSales = 0;
   let monthlySales = 0;
   const dailySales = {};
   const categorySales = {};
   const productSales = {};
+  const validOrderIds = new Set();
   
   const prodInfo = {};
-  for(let i=1; i<prods.length; i++) prodInfo[String(prods[i][0])] = { name: prods[i][1], cat: prods[i][2] };
+  for(let i=1; i<prods.length; i++) {
+    const id = String(prods[i][0]).trim();
+    prodInfo[id] = { name: prods[i][1], cat: prods[i][2] };
+  }
   
   for(let i=1; i<orders.length; i++) {
+    const status = String(orders[i][4]).toLowerCase();
+    if (status === 'returned' || status === 'cancelled') continue; 
+    
+    const orderBranch = String(orders[i][6]);
+    if (branchId && orderBranch !== String(branchId)) continue;
+
     const date = new Date(orders[i][5]);
+    if (start && date < start) continue;
+    if (end && date > end) continue;
+
+    const orderId = String(orders[i][0]).trim();
+    validOrderIds.add(orderId);
+    
     const amount = Number(orders[i][3]) || 0;
-    if (orders[i][4] === 'returned') continue; // Skip returned orders in reports
     
     totalSales += amount;
     if(date >= startOfMonth) monthlySales += amount;
-    const dStr = date.toISOString().split('T')[0];
-    dailySales[dStr] = (dailySales[dStr] || 0) + amount;
+    
+    try {
+      const dStr = date.toISOString().split('T')[0];
+      dailySales[dStr] = (dailySales[dStr] || 0) + amount;
+    } catch(e) {}
   }
   
   for(let i=1; i<items.length; i++) {
-    const pid = String(items[i][2]);
+    const orderId = String(items[i][1]).trim();
+    if (!validOrderIds.has(orderId)) continue;
+    
+    const pid = String(items[i][2]).trim();
     const qty = Number(items[i][5]) || 0;
-    const price = Number(items[i][6]) || 0;
-    const info = prodInfo[pid] || { name: 'Unknown', cat: 'Other' };
+    const info = prodInfo[pid] || { name: 'منتج غير معروف', cat: 'غير مصنف' };
+    
     productSales[info.name] = (productSales[info.name] || 0) + qty;
-    categorySales[info.cat] = (categorySales[info.cat] || 0) + (qty * price);
+    
+    const subtotal = Number(items[i][7]) || 0;
+    categorySales[info.cat] = (categorySales[info.cat] || 0) + subtotal;
   }
   
   return {
@@ -574,12 +610,91 @@ function getReportsData() {
     data: {
       totalSales,
       monthlySales,
-      orderCount: orders.length - 1,
+      orderCount: validOrderIds.size,
       dailySales,
       categorySales,
       topProducts: Object.entries(productSales).sort((a,b) => b[1] - a[1]).slice(0, 5)
     }
   };
+}
+
+function searchInvoice(query) {
+  if (!query) return { status: 'error', message: 'No query provided' };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const orders = ss.getSheetByName(SHEETS.ORDERS).getDataRange().getValues();
+  const customers = ss.getSheetByName(SHEETS.CUSTOMERS).getDataRange().getValues();
+  const results = [];
+  
+  const custMap = {};
+  for(let i=1; i<customers.length; i++) {
+    custMap[String(customers[i][0])] = { name: customers[i][1], phone: customers[i][2] };
+  }
+  
+  const q = String(query).toLowerCase();
+  
+  for(let i=1; i<orders.length; i++) {
+    const invNum = String(orders[i][1]).toLowerCase();
+    const custId = String(orders[i][2]);
+    const custInfo = custMap[custId] || { name: 'Unknown', phone: '' };
+    
+    if (invNum.includes(q) || custInfo.name.toLowerCase().includes(q) || custInfo.phone.includes(q)) {
+      results.push({
+        id: orders[i][0],
+        invoice_number: orders[i][1],
+        customer_name: custInfo.name,
+        customer_phone: custInfo.phone,
+        total_amount: orders[i][3],
+        status: orders[i][4],
+        created_at: orders[i][5]
+      });
+    }
+    if (results.length >= 20) break;
+  }
+  
+  return { status: 'success', data: results };
+}
+
+function getInvoiceDetails(invoiceId) {
+  if (!invoiceId) return { status: 'error', message: 'No invoiceId provided' };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const orders = ss.getSheetByName(SHEETS.ORDERS).getDataRange().getValues();
+  const items = ss.getSheetByName(SHEETS.ORDER_ITEMS).getDataRange().getValues();
+  const customers = ss.getSheetByName(SHEETS.CUSTOMERS).getDataRange().getValues();
+  
+  let order = null;
+  for(let i=1; i<orders.length; i++) {
+    if (String(orders[i][0]) === String(invoiceId)) {
+      const custId = String(orders[i][2]);
+      const customer = customers.find(c => String(c[0]) === custId) || ['', 'Unknown', ''];
+      order = {
+        id: orders[i][0],
+        invoice_number: orders[i][1],
+        customer_name: customer[1],
+        customer_phone: customer[2],
+        total_amount: orders[i][3],
+        status: orders[i][4],
+        created_at: orders[i][5]
+      };
+      break;
+    }
+  }
+  
+  if (!order) return { status: 'error', message: 'Invoice not found' };
+  
+  const orderItems = items
+    .filter(item => String(item[1]) === String(invoiceId))
+    .map(item => ({
+      id: item[0],
+      product_id: item[2],
+      sku: item[3],
+      product_name: item[4],
+      quantity: item[5],
+      unit_price: item[6],
+      subtotal: item[7],
+      vat: item[8]
+    }));
+    
+  return { status: 'success', data: { order, items: orderItems } };
 }
 
 function loginUser(payload) {
@@ -636,6 +751,98 @@ function loginUser(payload) {
   }
   
   return { status: 'error', message: 'User not found' };
+}
+
+function getInventoryStats(branchId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const prods = ss.getSheetByName(SHEETS.PRODUCTS).getDataRange().getValues();
+  const orders = ss.getSheetByName(SHEETS.ORDER_ITEMS).getDataRange().getValues();
+  const allOrders = ss.getSheetByName(SHEETS.ORDERS).getDataRange().getValues();
+  const returns = ss.getSheetByName(SHEETS.RETURN_EXCHANGE_ITEMS).getDataRange().getValues();
+  
+  // Filter orders by branch if provided
+  const validOrderIds = new Set();
+  for(let i=1; i<allOrders.length; i++) {
+    if (!branchId || String(allOrders[i][6]) === String(branchId)) {
+      validOrderIds.add(String(allOrders[i][0]));
+    }
+  }
+
+  let totalWarehouse = 0;
+  let totalAvailable = 0;
+  let totalSold = 0;
+  let totalReturned = 0;
+
+  // Products stock
+  for(let i=1; i<prods.length; i++) {
+    totalWarehouse += (Number(prods[i][5]) || 0); // Assuming stock is currently set as 'available'
+    totalAvailable += (Number(prods[i][5]) || 0);
+  }
+
+  // Sold items from filtered orders
+  for(let i=1; i<orders.length; i++) {
+    if (validOrderIds.has(String(orders[i][1]))) {
+      totalSold += (Number(orders[i][5]) || 0);
+    }
+  }
+
+  // Returns
+  for(let i=1; i<returns.length; i++) {
+    totalReturned += (Number(returns[i][3]) || 0);
+  }
+
+  return {
+    status: 'success',
+    data: {
+      warehouseBalance: totalWarehouse + totalSold, // Total that was ever in warehouse
+      availableBalance: totalAvailable,
+      soldBalance: totalSold,
+      returnedBalance: totalReturned
+    }
+  };
+}
+
+function getCashierPerformance(branchId, startDate, endDate) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const orders = ss.getSheetByName(SHEETS.ORDERS).getDataRange().getValues();
+  const users = ss.getSheetByName(SHEETS.USERS).getDataRange().getValues();
+  
+  const userMap = {};
+  for(let i=1; i<users.length; i++) {
+    userMap[String(users[i][1])] = users[i][2] || users[i][1]; // username -> name
+  }
+
+  const performance = {};
+  const start = startDate ? new Date(startDate) : null;
+  const end = endDate ? new Date(endDate) : null;
+
+  for(let i=1; i<orders.length; i++) {
+    const orderBranch = String(orders[i][6]);
+    const cashier = String(orders[i][7]);
+    const orderDate = new Date(orders[i][5]);
+    const amount = Number(orders[i][3]) || 0;
+
+    if (branchId && orderBranch !== String(branchId)) continue;
+    if (start && orderDate < start) continue;
+    if (end && orderDate > end) continue;
+
+    if (!performance[cashier]) {
+      performance[cashier] = {
+        username: cashier,
+        name: userMap[cashier] || cashier,
+        totalSales: 0,
+        orderCount: 0
+      };
+    }
+
+    performance[cashier].totalSales += amount;
+    performance[cashier].orderCount += 1;
+  }
+
+  return {
+    status: 'success',
+    data: Object.values(performance)
+  };
 }
 
 function logActivity(action, entity, entityId, details, status) {

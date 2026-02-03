@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Printer, CheckCircle, FileText } from "lucide-react";
 import { jsPDF } from "jspdf";
+import { useAuth } from "@/context/AuthContext";
+
 
 interface CheckoutModalProps {
     isOpen: boolean;
@@ -27,6 +29,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         address: ""
     });
 
+    const { user } = useAuth();
     const [lastInvoiceNumber, setLastInvoiceNumber] = useState("");
     const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
 
@@ -67,7 +70,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                 tax: tax,
                 total: total,
                 payment_method: paymentMethod,
-                invoiceNumber: invoiceNum
+                invoiceNumber: invoiceNum,
+                branch_id: user?.branch_id || '',
+                created_by: user?.username || ''
             };
 
             // Call Google Sheets API
@@ -96,13 +101,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         onClose();
     };
 
-    // Basic PDF Generation using jsPDF
+    // Updated PDF Generation to be more robust or just use print
     const handleDownloadPDF = () => {
-        const doc = new jsPDF();
-        doc.text(`Invoice: ${lastInvoiceNumber}`, 10, 10);
-        doc.text(`Customer: ${customer.name}`, 10, 20);
-        doc.text(`Total: ${total}`, 10, 30);
-        doc.save(`${lastInvoiceNumber}.pdf`);
+        window.print(); // Printing to PDF is usually better for Arabic support
     };
 
     return (
@@ -269,21 +270,97 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                         </Button>
                     </div>
                 )}
+
+                {/* Professional Printable Invoice (Hidden) */}
+                <div id="printable-invoice" className="hidden print:block p-8 bg-white text-gray-900 font-sans dir-rtl" style={{ direction: 'rtl' }}>
+                    <div className="text-center mb-8 border-b-2 border-gray-900 pb-6">
+                        <h1 className="text-4xl font-black mb-2 tracking-tighter">سجادة صلاتي</h1>
+                        <p className="text-lg font-bold">SEGADTY POS</p>
+                        <p className="text-sm mt-1">{user?.branch_id || 'الفرع الرئيسي'}</p>
+                    </div>
+
+                    <div className="flex justify-between items-start mb-8 text-sm">
+                        <div className="space-y-1">
+                            <p className="font-bold">رقم الفاتورة: <span className="font-mono">{lastInvoiceNumber}</span></p>
+                            <p className="font-bold">التاريخ: {new Date().toLocaleDateString('ar-SA')}</p>
+                            <p className="font-bold">الوقت: {new Date().toLocaleTimeString('ar-SA')}</p>
+                        </div>
+                        <div className="text-left space-y-1">
+                            <p className="font-bold">العميل: {customer.name}</p>
+                            <p className="font-bold">الجوال: {customer.phone}</p>
+                            <p className="font-bold">طريقة الدفع: {paymentMethod === 'cash' ? 'نقداً' : 'شبكة'}</p>
+                        </div>
+                    </div>
+
+                    <table className="w-full mb-8 border-collapse">
+                        <thead>
+                            <tr className="border-y-2 border-gray-900 text-sm">
+                                <th className="py-3 text-right">المنتج</th>
+                                <th className="py-3 text-center">الكمية</th>
+                                <th className="py-3 text-center">السعر</th>
+                                <th className="py-3 text-left">الإجمالي</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                            {cart.map((item) => (
+                                <tr key={item.id} className="text-sm">
+                                    <td className="py-4 font-bold">{item.name}</td>
+                                    <td className="py-4 text-center font-mono">{item.cartQuantity}</td>
+                                    <td className="py-4 text-center font-mono">{item.selling_price.toLocaleString()}</td>
+                                    <td className="py-4 text-left font-mono">{(item.cartQuantity * item.selling_price).toLocaleString()}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    <div className="flex justify-end mb-10">
+                        <div className="w-64 space-y-2 border-t-2 border-gray-900 pt-4">
+                            <div className="flex justify-between text-sm">
+                                <span>المجموع الفرعي:</span>
+                                <span className="font-mono">{subtotal.toLocaleString()} ر.س</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span>ضريبة القيمة المضافة (15%):</span>
+                                <span className="font-mono">{tax.toLocaleString()} ر.س</span>
+                            </div>
+                            <div className="flex justify-between text-xl font-black mt-2 pt-2 border-t-2 border-dashed border-gray-300">
+                                <span>الإجمالي النهائي:</span>
+                                <span className="font-mono">{total.toLocaleString()} ر.س</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="text-center space-y-4 pt-10 border-t border-gray-100">
+                        <div className="flex justify-center items-center gap-10 text-xs font-bold text-gray-500">
+                            <p>الكاشير: {user?.name || user?.username || '-'}</p>
+                            <p>رقم الكاشير: {user?.id?.slice(-4) || '-'}</p>
+                        </div>
+                        <p className="text-sm font-bold">شكراً لزيارتكم! نأمل رؤيتكم قريباً</p>
+                        <p className="text-[10px] text-gray-400">segadty.com | 2024 © جميع الحقوق محفوظة</p>
+                    </div>
+                </div>
             </div>
 
-            {/* Simple print styles */}
+            {/* Premium Print Styles */}
             <style jsx global>{`
         @media print {
-            body * {
-                visibility: hidden;
+            body {
+                background: white;
+                margin: 0;
+                padding: 0;
             }
-            .checkout-modal, .checkout-modal * {
-                visibility: visible;
+            body > *:not(#printable-invoice-container) {
+                display: none !important;
             }
-            .checkout-modal {
-                position: absolute;
-                left: 0;
-                top: 0;
+            #printable-invoice-container {
+                display: block !important;
+                width: 100%;
+                height: 100%;
+            }
+            #printable-invoice {
+                display: block !important;
+                visibility: visible !important;
+                width: 100%;
             }
         }
       `}</style>

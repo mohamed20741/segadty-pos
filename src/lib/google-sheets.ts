@@ -195,6 +195,64 @@ export async function processReturnExchange(payload: any) {
 }
 
 /**
+ * جلب بيانات التقارير والإحصائيات
+ */
+export async function getReportsData(branchId?: string, startDate?: string, endDate?: string) {
+    if (!SHEET_URL) return null;
+    try {
+        let url = `${SHEET_URL}?action=getReportsData`;
+        if (branchId) url += `&branchId=${branchId}`;
+        if (startDate) url += `&startDate=${startDate}`;
+        if (endDate) url += `&endDate=${endDate}`;
+
+        const res = await fetch(url);
+        const json = await res.json();
+        return json.status === 'success' ? json.data : null;
+    } catch (error) {
+        console.error("Failed to fetch reports data:", error);
+        return null;
+    }
+}
+
+/**
+ * جلب إحصائيات المخزون
+ */
+export async function getInventoryStats(branchId?: string) {
+    if (!SHEET_URL) return null;
+    try {
+        let url = `${SHEET_URL}?action=getInventoryStats`;
+        if (branchId) url += `&branchId=${branchId}`;
+
+        const res = await fetch(url);
+        const json = await res.json();
+        return json.status === 'success' ? json.data : null;
+    } catch (error) {
+        console.error("Failed to fetch inventory stats:", error);
+        return null;
+    }
+}
+
+/**
+ * جلب أداء الكاشير
+ */
+export async function getCashierPerformance(branchId?: string, startDate?: string, endDate?: string) {
+    if (!SHEET_URL) return null;
+    try {
+        let url = `${SHEET_URL}?action=getCashierPerformance`;
+        if (branchId) url += `&branchId=${branchId}`;
+        if (startDate) url += `&startDate=${startDate}`;
+        if (endDate) url += `&endDate=${endDate}`;
+
+        const res = await fetch(url);
+        const json = await res.json();
+        return json.status === 'success' ? json.data : null;
+    } catch (error) {
+        console.error("Failed to fetch cashier performance:", error);
+        return null;
+    }
+}
+
+/**
  * تسجيل الدخول
  */
 export async function loginUser(credentials: any) {
