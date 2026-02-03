@@ -13,6 +13,9 @@ interface CartContextType {
     tax: number;
     total: number;
     itemCount: number;
+    discount: { type: 'amount' | 'percent', value: number };
+    setDiscount: (discount: { type: 'amount' | 'percent', value: number }) => void;
+    subtotalRaw: number;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -90,13 +93,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         setCart([]);
     };
 
-    // Calculations
-    const subtotal = cart.reduce(
+    const [discount, setDiscount] = useState<{ type: 'amount' | 'percent', value: number }>({ type: 'amount', value: 0 });
+
+    // Calculations (Assumes Tax Inclusive Prices)
+    const subtotalRaw = cart.reduce(
         (acc, item) => acc + item.selling_price * item.cartQuantity,
         0
     );
-    const tax = subtotal * 0.15; // 15% VAT
-    const total = subtotal + tax;
+
+    let discountAmount = 0;
+    if (discount.type === 'amount') {
+        discountAmount = discount.value;
+    } else {
+        discountAmount = subtotalRaw * (discount.value / 100);
+    }
+
+    // Ensure discount doesn't exceed total
+    if (discountAmount > subtotalRaw) discountAmount = subtotalRaw;
+
+    const total = subtotalRaw - discountAmount;
+    const subtotal = total / 1.15; // Price before tax
+    const tax = total - subtotal;   // The tax amount
+
+    // Original subtotal (for display if needed)
+    // const grossTotal = subtotalRaw;
+
     const itemCount = cart.reduce((acc, item) => acc + item.cartQuantity, 0);
 
     return (
@@ -107,10 +128,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 removeFromCart,
                 updateQuantity,
                 clearCart,
-                subtotal,
+                subtotal, // This is now Net Subtotal (excl tax)
                 tax,
-                total,
+                total,    // This is Net Total (inc tax)
                 itemCount,
+                discount,
+                setDiscount,
+                subtotalRaw // Gross Total before discount
             }}
         >
             {children}

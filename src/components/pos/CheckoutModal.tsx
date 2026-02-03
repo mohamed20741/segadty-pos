@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
-import { Customer } from "@/types";
+import { Customer, Branch } from "@/types";
 import { SAUDI_CITIES } from "@/lib/data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Printer, CheckCircle, FileText } from "lucide-react";
+import { X, Printer, CheckCircle, FileText, CreditCard } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { getBranchesFromSheet } from "@/lib/google-sheets";
 
 interface CheckoutModalProps {
     isOpen: boolean;
@@ -15,9 +16,11 @@ interface CheckoutModalProps {
 }
 
 export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
-    const { cart, total, subtotal, tax, clearCart } = useCart();
+    const { cart, total, subtotalRaw, tax, clearCart, discount } = useCart();
     const [step, setStep] = useState<"form" | "success">("form");
     const [isProcessing, setIsProcessing] = useState(false);
+    const [branchName, setBranchName] = useState("");
+    const [availablePaymentMethods, setAvailablePaymentMethods] = useState<any[]>([]);
 
     const [customer, setCustomer] = useState<Customer>({
         name: "",
@@ -29,7 +32,38 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
     const { user } = useAuth();
     const [lastInvoiceNumber, setLastInvoiceNumber] = useState("");
-    const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
+    const [paymentMethod, setPaymentMethod] = useState<string>("نقداً (Cash)");
+
+    useEffect(() => {
+        async function fetchBranchName() {
+            if (user?.branch_id) {
+                const branches = await getBranchesFromSheet();
+                if (branches) {
+                    const branch = branches.find((b: Branch) => b.id === user.branch_id);
+                    if (branch) setBranchName(branch.name);
+                }
+            }
+        }
+
+        // Load payment methods
+        const savedMethods = localStorage.getItem('segadty_payment_methods');
+        if (savedMethods) {
+            const methods = JSON.parse(savedMethods);
+            setAvailablePaymentMethods(methods);
+            // Set default
+            const defaultMethod = methods.find((m: any) => m.isDefault);
+            if (defaultMethod) setPaymentMethod(defaultMethod.name);
+        } else {
+            // Fallback defaults
+            setAvailablePaymentMethods([
+                { id: 'cash', name: 'نقداً (Cash)' },
+                { id: 'card', name: 'شبكة (Card)' }
+            ]);
+            setPaymentMethod('نقداً (Cash)');
+        }
+
+        if (isOpen) fetchBranchName();
+    }, [isOpen, user?.branch_id]);
 
     if (!isOpen) return null;
 
@@ -60,7 +94,8 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     quantity: item.cartQuantity,
                     price: item.selling_price
                 })),
-                subtotal: subtotal,
+                subtotal: subtotalRaw, // Send gross subtotal
+                discount: discount.value > 0 ? discount : null,
                 tax: tax,
                 total: total,
                 payment_method: paymentMethod,
@@ -83,6 +118,16 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
     const handlePrint = () => {
         try {
+            // Calculate discount amount for display
+            let discountAmount = 0;
+            if (discount.type === 'amount') {
+                discountAmount = discount.value;
+            } else {
+                discountAmount = subtotalRaw * (discount.value / 100);
+            }
+            if (discountAmount > subtotalRaw) discountAmount = subtotalRaw;
+
+
             const invoiceHTML = `
                 <!DOCTYPE html>
                 <html lang="ar" dir="rtl">
@@ -144,16 +189,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                              margin-top: 10px;
                         }
     
-                        /* Placeholder Boxes (Optional, hidden based on request but structure kept) */
-                        .box-placeholder {
-                            width: 80px;
-                            height: 80px;
-                            border: 1px solid #000;
-                            position: absolute;
-                            display: none; /* Hide by default as per request to remove QR/Barcode boxes, enable if needed */
-                        }
-    
-                        /* Customer & Invoice Details */
+                        /* Details Grid */
                         .details-grid {
                             display: flex;
                             justify-content: space-between;
@@ -293,8 +329,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                     <div class="invoice-page">
                         <div class="header-section">
                             <div class="company-info">
-                                <div class="company-name">شركة نعمة سجادتي التجارية</div>
-                                <!-- <div class="company-sub">Segadty Trading Co.</div> -->
+                                <div class="company-name">شركة نخبة سجادتي التجارية</div>
                                 <div class="invoice-title">فاتورة ضريبية مبسطة</div>
                             </div>
                         </div>
@@ -303,11 +338,11 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                             <div class="details-right">
                                 <div class="info-row">
                                     <span class="info-label">طريقة الدفع:</span>
-                                    <span class="info-value">${paymentMethod === 'cash' ? 'نقداً' : 'بطاقة مدى / ائتمان'}</span>
+                                    <span class="info-value">${paymentMethod}</span>
                                 </div>
                                 <div class="info-row">
                                     <span class="info-label">الفرع:</span>
-                                    <span class="info-value">${user?.branch_id || 'الفرع الرئيسي'}</span>
+                                    <span class="info-value">${branchName || user?.branch_id || 'الفرع الرئيسي'}</span>
                                 </div>
                             </div>
     
@@ -370,15 +405,22 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                                  <div class="totals-header">تفاصيل السعر</div>
                                  
                                  <div class="total-row">
-                                     <span>المجموع غير شامل الضريبة</span>
-                                     <span>SAR ${(total / 1.15).toFixed(2)}</span>
+                                     <span>المجموع (شامل الضريبة)</span>
+                                     <span>SAR ${subtotalRaw.toFixed(2)}</span>
                                  </div>
+                                 ${discountAmount > 0 ? `
+                                 <div class="total-row" style="color: red;">
+                                     <span>الخصم</span>
+                                     <span>- SAR ${discountAmount.toFixed(2)}</span>
+                                 </div>
+                                 ` : ''}
+                                 
                                  <div class="total-row">
-                                     <span>ضريبة القيمة المضافة (15%)</span>
-                                     <span>SAR ${(total - (total / 1.15)).toFixed(2)}</span>
+                                     <span>الضريبة (15%)</span>
+                                     <span>SAR ${tax.toFixed(2)}</span>
                                  </div>
                                  <div class="total-row final">
-                                     <span>المجموع الكلي</span>
+                                     <span>المجموع النهائي</span>
                                      <span>SAR ${total.toFixed(2)}</span>
                                  </div>
                             </div>
@@ -506,29 +548,32 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
                             <div className="space-y-4">
                                 <label className="text-sm font-bold text-gray-700">طريقة الدفع</label>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setPaymentMethod("cash")}
-                                        className={`flex items-center justify-center gap-3 h-14 rounded-2xl border-2 transition-all ${paymentMethod === 'cash' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
-                                    >
-                                        <span className="font-bold">نقداً (Cash)</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setPaymentMethod("card")}
-                                        className={`flex items-center justify-center gap-3 h-14 rounded-2xl border-2 transition-all ${paymentMethod === 'card' ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
-                                    >
-                                        <span className="font-bold">شبكة (Card)</span>
-                                    </button>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3"> {/* Responsive grid */}
+                                    {availablePaymentMethods.map((method) => (
+                                        <button
+                                            key={method.id}
+                                            type="button"
+                                            onClick={() => setPaymentMethod(method.name)}
+                                            className={`flex flex-col items-center justify-center gap-2 p-3 h-20 rounded-2xl border-2 transition-all ${paymentMethod === method.name ? 'border-primary bg-primary/5 text-primary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                        >
+                                            <CreditCard className={`w-5 h-5 ${paymentMethod === method.name ? 'text-primary' : 'text-gray-300'}`} />
+                                            <span className="font-bold text-xs text-center line-clamp-2">{method.name}</span>
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
 
                             <div className="bg-gray-50 p-6 rounded-2xl space-y-3 border border-gray-100">
                                 <div className="flex justify-between text-sm text-gray-500">
-                                    <span>المجموع الفرعي</span>
-                                    <span>{subtotal.toLocaleString()} ر.س</span>
+                                    <span>المجموع (شامل الضريبة)</span>
+                                    <span>{subtotalRaw.toLocaleString()} ر.س</span>
                                 </div>
+                                {discount.value > 0 && (
+                                    <div className="flex justify-between text-sm text-red-500 font-bold">
+                                        <span>الخصم</span>
+                                        <span>- {(subtotalRaw - total).toLocaleString()} ر.س</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between text-sm text-gray-500">
                                     <span>ضريبة القيمة المضافة (15%)</span>
                                     <span>{tax.toLocaleString()} ر.س</span>
