@@ -82,7 +82,227 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     };
 
     const handlePrint = () => {
-        window.print();
+        // 1. Prepare the content
+        const invoiceHTML = `
+            <!DOCTYPE html>
+            <html lang="ar" dir="rtl">
+            <head>
+                <meta charset="UTF-8">
+                <title>Invoice #${lastInvoiceNumber}</title>
+                <style>
+                    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+                    body {
+                        font-family: 'Cairo', sans-serif;
+                        margin: 0;
+                        padding: 20px;
+                        background: white;
+                        color: black;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    .invoice-container {
+                        max-width: 800px;
+                        margin: 0 auto;
+                        border: 1px solid #eee;
+                        padding: 40px;
+                    }
+                    .header {
+                        text-align: center;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 20px;
+                        margin-bottom: 30px;
+                    }
+                    .title {
+                        font-size: 32px;
+                        font-weight: 900;
+                        margin: 0;
+                        color: #000;
+                    }
+                    .subtitle {
+                        font-size: 14px;
+                        letter-spacing: 4px;
+                        font-weight: bold;
+                        margin: 5px 0 0;
+                        color: #333;
+                        display: block;
+                    }
+                    .meta-grid {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 30px;
+                    }
+                    .meta-col {
+                        flex: 1;
+                    }
+                    .meta-row {
+                        margin-bottom: 8px;
+                        font-size: 14px;
+                    }
+                    .label {
+                        font-weight: bold;
+                        color: #555;
+                        width: 100px;
+                        display: inline-block;
+                    }
+                    .value {
+                        font-weight: bold;
+                        font-family: monospace;
+                        font-size: 16px;
+                    }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 30px;
+                    }
+                    th {
+                        background: #f9fafb;
+                        padding: 12px;
+                        text-align: inherit;
+                        border-top: 2px solid #000;
+                        border-bottom: 2px solid #000;
+                        font-weight: 800;
+                        font-size: 14px;
+                    }
+                    td {
+                        padding: 12px;
+                        border-bottom: 1px solid #eee;
+                        font-size: 14px;
+                    }
+                    .summary {
+                        display: flex;
+                        justify-content: flex-end;
+                    }
+                    .summary-box {
+                        width: 300px;
+                        border-top: 2px solid #000;
+                        padding-top: 10px;
+                    }
+                    .summary-row {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 5px;
+                        font-size: 14px;
+                    }
+                    .total-row {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-top: 10px;
+                        padding-top: 10px;
+                        border-top: 1px dashed #ccc;
+                        font-weight: 900;
+                        font-size: 18px;
+                    }
+                    .footer {
+                        margin-top: 50px;
+                        text-align: center;
+                        font-size: 12px;
+                        color: #666;
+                        border-top: 1px solid #eee;
+                        padding-top: 20px;
+                    }
+                    @media print {
+                        .no-print { display: none; }
+                        body { background: white; }
+                        @page { margin: 0; size: auto; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="invoice-container">
+                    <div class="header">
+                        <h1 class="title">سجادة صلاتي</h1>
+                        <span class="subtitle">SEGADTY POS</span>
+                        <p style="margin-top: 10px; font-size: 12px; font-weight: bold;">
+                            الفرع: ${user?.branch_id || 'الفرع الرئيسي'}
+                        </p>
+                    </div>
+
+                    <div class="meta-grid">
+                        <div class="meta-col">
+                            <div class="meta-row"><span class="label">رقم الفاتورة:</span> <span class="value">${lastInvoiceNumber}</span></div>
+                            <div class="meta-row"><span class="label">التاريخ:</span> <span>${new Date().toLocaleDateString('ar-SA')}</span></div>
+                            <div class="meta-row"><span class="label">الوقت:</span> <span>${new Date().toLocaleTimeString('ar-SA')}</span></div>
+                        </div>
+                        <div class="meta-col" style="text-align: left;">
+                            <div class="meta-row"><span class="value">${customer.name}</span> <span class="label" style="text-align: right;">:العميل</span> </div>
+                            <div class="meta-row"><span>${paymentMethod === 'cash' ? 'نقداً (Cash)' : 'شبكة (Card)'}</span> <span class="label" style="text-align: right;">:الدفع</span></div>
+                        </div>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="text-align: right;">المنتج</th>
+                                <th style="text-align: center;">الكمية</th>
+                                <th style="text-align: center;">السعر</th>
+                                <th style="text-align: left;">الإجمالي</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${cart.map(item => `
+                                <tr>
+                                    <td style="font-weight: bold;">${item.name}</td>
+                                    <td style="text-align: center; font-family: monospace;">${item.cartQuantity}</td>
+                                    <td style="text-align: center; font-family: monospace;">${item.selling_price.toLocaleString()}</td>
+                                    <td style="text-align: left; font-family: monospace; font-weight: bold;">${(item.cartQuantity * item.selling_price).toLocaleString()}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+
+                    <div class="summary">
+                        <div class="summary-box">
+                            <div class="summary-row">
+                                <span>المجموع الفرعي:</span>
+                                <span style="font-family: monospace;">${subtotal.toLocaleString()}</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>الضريبة (15%):</span>
+                                <span style="font-family: monospace;">${tax.toLocaleString()}</span>
+                            </div>
+                            <div class="total-row">
+                                <span>الإجمالي النهائي:</span>
+                                <div>
+                                    <span style="font-family: monospace;">${total.toLocaleString()}</span>
+                                    <span style="font-size: 12px;"> ريال</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="footer">
+                        <p>الكاشير: ${user?.name || user?.username || 'نظام آلي'}</p>
+                        <p style="font-weight: bold; margin: 10px 0;">شكراً لزيارتكم! نأمل رؤيتكم قريباً</p>
+                        <p>www.segadty.com</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        // 2. Create invisible iframe
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        // 3. Write content
+        const doc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (doc) {
+            doc.open();
+            doc.write(invoiceHTML);
+            doc.close();
+        }
+
+        // 4. Print with delay to ensure styles load
+        setTimeout(() => {
+            iframe.contentWindow?.focus();
+            iframe.contentWindow?.print();
+
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(iframe);
+            }, 1000);
+        }, 500);
     };
 
     const handleNewOrder = () => {
@@ -239,131 +459,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
                         </Button>
                     </div>
                 )}
-
-                {/* Professional Printable Invoice (VIP Design) */}
-                <div id="printable-invoice-wrapper" className="hidden print:block">
-                    <div id="printable-invoice" className="p-8 bg-white text-black font-sans dir-rtl" style={{ direction: 'rtl', color: 'black' }}>
-                        {/* Header */}
-                        <div className="text-center border-b-2 border-black pb-6 mb-8">
-                            <h1 className="text-4xl font-bold mb-1" style={{ color: 'black' }}>سجادة صلاتي</h1>
-                            <p className="text-sm font-bold tracking-widest" style={{ color: 'black' }}>SEGADTY POS</p>
-                            <p className="text-xs mt-2" style={{ color: 'black' }}>الفرع: {user?.branch_id || 'الفرع الرئيسي'}</p>
-                        </div>
-
-                        {/* Customer & Info */}
-                        <div className="flex justify-between text-sm mb-8">
-                            <div className="space-y-1">
-                                <p className="font-bold">رقم الفاتورة: <span className="font-mono">{lastInvoiceNumber}</span></p>
-                                <p>التاريخ: {new Date().toLocaleDateString('ar-SA')}</p>
-                                <p>الوقت: {new Date().toLocaleTimeString('ar-SA')}</p>
-                            </div>
-                            <div className="text-left space-y-1">
-                                <p className="font-bold">العميل: {customer.name}</p>
-                                <p>طريقة الدفع: {paymentMethod === 'cash' ? 'نقداً' : 'شبكة'}</p>
-                            </div>
-                        </div>
-
-                        {/* Items Table */}
-                        <table className="w-full mb-8 border-collapse">
-                            <thead>
-                                <tr className="border-y border-black text-xs font-bold">
-                                    <th className="py-2 text-right">المنتج</th>
-                                    <th className="py-2 text-center">الكمية</th>
-                                    <th className="py-2 text-center">السعر</th>
-                                    <th className="py-2 text-left">الإجمالي</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {cart.map((item) => (
-                                    <tr key={item.id} className="text-sm border-b border-gray-100">
-                                        <td className="py-3 font-bold">{item.name}</td>
-                                        <td className="py-3 text-center">{item.cartQuantity}</td>
-                                        <td className="py-3 text-center">{item.selling_price.toLocaleString()}</td>
-                                        <td className="py-3 text-left font-bold">{(item.cartQuantity * item.selling_price).toLocaleString()}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        {/* Summary */}
-                        <div className="flex justify-end mb-8">
-                            <div className="w-48 space-y-1 text-sm border-t border-black pt-2">
-                                <div className="flex justify-between">
-                                    <span>المجموع الفرعي:</span>
-                                    <span>{subtotal.toLocaleString()} ر.س</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span>ضريبة (15%):</span>
-                                    <span>{tax.toLocaleString()} ر.س</span>
-                                </div>
-                                <div className="flex justify-between font-bold text-lg pt-2 mt-2 border-t border-dashed border-gray-300">
-                                    <span>الإجمالي:</span>
-                                    <span>{total.toLocaleString()} ريال</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer */}
-                        <div className="text-center pt-8 border-t border-black">
-                            <p className="text-xs mb-2">الكاشير: {user?.name || user?.username}</p>
-                            <p className="text-sm font-bold">شكراً لزيارتكم!</p>
-                            <div className="mt-4 border border-black inline-block px-4 py-1 text-[10px] font-bold">
-                                ORIGINAL RECEIPT - فاتورة أصلية
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
-
-            <style jsx global>{`
-                @media print {
-                    /* Reset everything */
-                    html, body {
-                        background-color: white !important;
-                        color: black !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        height: auto !important;
-                        -webkit-print-color-adjust: exact !important;
-                        print-color-adjust: exact !important;
-                    }
-
-                    /* Hide all UI elements */
-                    body > *:not(#printable-invoice-wrapper) {
-                        display: none !important;
-                    }
-
-                    /* Important: ensure the wrapper is shown from the top */
-                    #printable-invoice-wrapper {
-                        display: block !important;
-                        visibility: visible !important;
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 100% !important;
-                        background: white !important;
-                    }
-
-                    #printable-invoice {
-                        display: block !important;
-                        visibility: visible !important;
-                        width: 100% !important;
-                        max-width: 800px;
-                        margin: 0 auto !important;
-                    }
-
-                    /* Ensure text is actually BLACK */
-                    #printable-invoice * {
-                        color: black !important;
-                        border-color: black !important;
-                    }
-
-                    @page {
-                        size: auto;
-                        margin: 1cm;
-                    }
-                }
-            `}</style>
         </div>
     );
 }
