@@ -109,9 +109,9 @@ export default function UsersPage() {
 
     const isUserActive = (status: any) => {
         if (!status) return false;
-        const s = status.toString().trim().toLowerCase();
-        // ندعم القيم العربية والإنجليزية ومختلف الحالات
-        return s === 'active' || s === 'نشط' || s === '1' || s === 'true' || s === 'yes' || s === 'active ';
+        const s = String(status).trim().toLowerCase();
+        // ندعم كل القيم الممكنة للنشاط
+        return s === 'active' || s === 'نشط' || s === '1' || s === 'true' || s === 'yes';
     };
 
     const getBranchName = (branchId: string) => {
@@ -417,7 +417,7 @@ export default function UsersPage() {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-gray-700">الصلاحية</label>
+                                        <label className="text-sm font-bold text-gray-700">الصلاحية / الدور</label>
                                         <select
                                             className="w-full h-11 px-3 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
                                             value={editingUser.role}
@@ -429,17 +429,30 @@ export default function UsersPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-bold text-gray-700">الحالة</label>
+                                        <label className="text-sm font-bold text-gray-700">الفرع التابع له</label>
                                         <select
                                             className="w-full h-11 px-3 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
-                                            value={editingUser.status}
-                                            onChange={e => setEditingUser(prev => prev ? ({ ...prev, status: e.target.value as any }) : null)}
+                                            value={editingUser.branch_id || ""}
+                                            onChange={e => setEditingUser(prev => prev ? ({ ...prev, branch_id: e.target.value }) : null)}
                                         >
-                                            <option value="active">نشط</option>
-                                            <option value="inactive">معطل</option>
-                                            <option value="blocked">محظور</option>
+                                            <option value="">صلاحية عامة (كل الفروع)</option>
+                                            {branches.map(b => (
+                                                <option key={b.id} value={b.id}>{b.name}</option>
+                                            ))}
                                         </select>
                                     </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-gray-700">الحالة</label>
+                                    <select
+                                        className="w-full h-11 px-3 bg-white border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary outline-none"
+                                        value={editingUser.status}
+                                        onChange={e => setEditingUser(prev => prev ? ({ ...prev, status: e.target.value as any }) : null)}
+                                    >
+                                        <option value="active">نشط (Active)</option>
+                                        <option value="inactive">معطل (Inactive)</option>
+                                        <option value="blocked">محظور (Blocked)</option>
+                                    </select>
                                 </div>
 
                                 <div className="flex gap-3 pt-4">
