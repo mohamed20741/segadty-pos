@@ -40,14 +40,17 @@ export function Sidebar() {
     );
 
     return (
-        <aside className="hidden md:flex flex-col w-72 bg-[#3E2723] text-white border-l border-[#5D4037] h-screen shadow-2xl transition-all">
-            <div className="p-8 flex items-center gap-4 border-b border-white/10 bg-[#321f1b]">
-                <div className="bg-secondary p-2.5 rounded-xl shadow-lg shadow-secondary/20">
-                    <Store className="w-6 h-6 text-[#3E2723]" />
+        <aside className={cn(
+            "hidden md:flex flex-col w-72 text-foreground border-l border-border h-screen shadow-2xl transition-all",
+            "bg-card"
+        )}>
+            <div className="p-8 flex items-center gap-4 border-b border-border bg-muted/30">
+                <div className="bg-primary p-2.5 rounded-xl shadow-lg shadow-primary/20">
+                    <Store className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <div>
-                    <h1 className="text-xl font-bold text-white tracking-wide font-sans">Segadty</h1>
-                    <p className="text-xs text-secondary/90 font-medium">نظام نقاط البيع</p>
+                    <h1 className="text-xl font-bold text-foreground tracking-wide font-sans">Segadty</h1>
+                    <p className="text-xs text-muted-foreground font-medium">نظام نقاط البيع</p>
                 </div>
             </div>
 
@@ -61,22 +64,22 @@ export function Sidebar() {
                             className={cn(
                                 "flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden",
                                 isActive
-                                    ? "bg-gradient-to-l from-primary to-[#5D4037] text-white shadow-lg"
-                                    : "text-gray-300 hover:bg-white/5 hover:text-white hover:translate-x-[-4px]"
+                                    ? "bg-primary text-primary-foreground shadow-lg"
+                                    : "text-muted-foreground hover:bg-muted hover:text-foreground hover:translate-x-[-4px]"
                             )}
                         >
-                            <item.icon className={cn("w-5 h-5 transition-colors", isActive ? "text-secondary" : "text-gray-400 group-hover:text-secondary")} />
+                            <item.icon className={cn("w-5 h-5 transition-colors", isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground")} />
                             <span className="font-bold tracking-wide">{item.label}</span>
 
                             {isActive && (
-                                <div className="absolute right-0 top-0 bottom-0 w-1 bg-secondary shadow-[0_0_10px_#D4AF37]" />
+                                <div className="absolute right-0 top-0 bottom-0 w-1 bg-primary-foreground shadow-[0_0_10px_rgba(255,255,255,0.3)]" />
                             )}
                         </Link>
                     );
                 })}
             </nav>
 
-            <div className="p-4 border-t border-white/10 bg-[#321f1b]">
+            <div className="p-4 border-t border-border bg-muted/30">
                 <button
                     onClick={logout}
                     className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-red-300 hover:bg-red-500/10 hover:text-red-200 transition-colors"

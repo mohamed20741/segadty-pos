@@ -1,20 +1,13 @@
 "use client";
 
-import { Bell, Search, Database, CheckCircle, XCircle, Loader2, RefreshCw, LogOut, User as UserIcon, Menu, X, RotateCcw, ShoppingCart } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Bell, Search, Database, CheckCircle, XCircle, Loader2, RefreshCw, LogOut, User as UserIcon, Menu, X, RotateCcw, ShoppingCart, Moon, Sun, Monitor } from "lucide-react";
+import { useState } from "react";
 import { testConnection } from "@/lib/google-sheets";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-
-// Mobile Menu Import (we will use a simplified version of sidebar items here)
-const mobileMenuItems = [
-    { href: "/dashboard", label: "الرئيسية", icon: ShoppingCart },
-    { href: "/pos", label: "نقطة البيع", icon: ShoppingCart },
-    { href: "/returns", label: "المرتجعات والتبديل", icon: RotateCcw },
-    { href: "/inventory", label: "المخزون", icon: RotateCcw },
-];
 
 function DbStatusButton() {
     const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -71,9 +64,11 @@ function DbStatusButton() {
 
 export function Header() {
     const { user, logout } = useAuth();
+    const { theme, setTheme } = useTheme();
     const pathname = usePathname();
     const [showNotifications, setShowNotifications] = useState(false);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [showThemeMenu, setShowThemeMenu] = useState(false);
 
     // Generate initials from name
     const getInitials = (name: string) => {
@@ -86,12 +81,12 @@ export function Header() {
     };
 
     return (
-        <header className="h-20 bg-white border-b border-gray-100 px-4 md:px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm/50 backdrop-blur-md bg-white/90">
+        <header className="h-20 bg-card border-b border-border px-4 md:px-8 flex items-center justify-between sticky top-0 z-30 shadow-sm/50 backdrop-blur-md bg-card/90">
             <div className="flex items-center gap-4 md:gap-6 flex-1">
                 {/* Mobile Menu Toggle */}
                 <button
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="md:hidden p-2 rounded-xl bg-gray-50 text-gray-600 hover:bg-gray-100"
+                    className="md:hidden p-2 rounded-xl bg-muted text-muted-foreground hover:bg-muted/80"
                 >
                     {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
                 </button>
@@ -103,11 +98,61 @@ export function Header() {
 
                 <DbStatusButton />
 
+                {/* Theme Toggle Button */}
+                <div className="relative">
+                    <button
+                        onClick={() => setShowThemeMenu(!showThemeMenu)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-all duration-300 font-bold text-xs"
+                    >
+                        {theme === 'light' && <Sun className="w-4 h-4" />}
+                        {theme === 'dark' && <Moon className="w-4 h-4" />}
+                        {theme === 'system' && <Monitor className="w-4 h-4" />}
+                        <span className="hidden sm:inline">
+                            {theme === 'light' ? 'فاتح' : theme === 'dark' ? 'داكن' : 'تلقائي'}
+                        </span>
+                    </button>
+
+                    {showThemeMenu && (
+                        <div className="absolute left-0 mt-2 w-48 bg-card rounded-xl shadow-2xl border border-border py-2 z-50 animate-in fade-in slide-in-from-top-3 duration-200">
+                            <button
+                                onClick={() => { setTheme('light'); setShowThemeMenu(false); }}
+                                className={cn(
+                                    "flex items-center gap-3 w-full px-4 py-2 text-right hover:bg-muted transition-colors",
+                                    theme === 'light' && "bg-primary/10 text-primary"
+                                )}
+                            >
+                                <Sun className="w-4 h-4" />
+                                <span className="font-bold text-sm">الوضع الفاتح</span>
+                            </button>
+                            <button
+                                onClick={() => { setTheme('dark'); setShowThemeMenu(false); }}
+                                className={cn(
+                                    "flex items-center gap-3 w-full px-4 py-2 text-right hover:bg-muted transition-colors",
+                                    theme === 'dark' && "bg-primary/10 text-primary"
+                                )}
+                            >
+                                <Moon className="w-4 h-4" />
+                                <span className="font-bold text-sm">الوضع الداكن</span>
+                            </button>
+                            <button
+                                onClick={() => { setTheme('system'); setShowThemeMenu(false); }}
+                                className={cn(
+                                    "flex items-center gap-3 w-full px-4 py-2 text-right hover:bg-muted transition-colors",
+                                    theme === 'system' && "bg-primary/10 text-primary"
+                                )}
+                            >
+                                <Monitor className="w-4 h-4" />
+                                <span className="font-bold text-sm">تبع النظام</span>
+                            </button>
+                        </div>
+                    )}
+                </div>
+
                 <div className="hidden lg:block w-72 xl:w-96 relative group">
-                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary transition-colors" />
+                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <input
                         placeholder="بحث سريع..."
-                        className="w-full bg-gray-50/50 border border-gray-200 rounded-2xl pl-4 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-inner"
+                        className="w-full bg-muted/50 border border-border rounded-2xl pl-4 pr-11 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-inner text-foreground"
                     />
                 </div>
             </div>
@@ -118,7 +163,7 @@ export function Header() {
                     href="/returns"
                     className={cn(
                         "hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-bold text-xs",
-                        pathname === "/returns" ? "bg-amber-100 text-amber-700" : "bg-gray-50 text-gray-600 hover:bg-gray-100"
+                        pathname === "/returns" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400" : "bg-muted text-muted-foreground hover:bg-muted/80"
                     )}
                 >
                     <RotateCcw className="w-4 h-4" />
@@ -130,34 +175,34 @@ export function Header() {
                         onClick={() => setShowNotifications(!showNotifications)}
                         className={cn(
                             "relative p-2.5 rounded-full transition-all duration-300",
-                            showNotifications ? "bg-primary/10 text-primary" : "hover:bg-gray-100/80 text-gray-500 hover:text-primary"
+                            showNotifications ? "bg-primary/10 text-primary" : "hover:bg-muted/80 text-muted-foreground hover:text-primary"
                         )}
                     >
                         <Bell className="w-6 h-6" />
-                        <span className="absolute top-2 right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+                        <span className="absolute top-2 right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-card animate-pulse" />
                     </button>
 
                     {showNotifications && (
-                        <div className="absolute left-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 py-4 z-50 animate-in fade-in slide-in-from-top-3 duration-300">
-                            <div className="px-6 pb-3 border-b border-gray-50 flex items-center justify-between">
-                                <h3 className="font-bold text-gray-800">التنبيهات</h3>
+                        <div className="absolute left-0 mt-3 w-80 bg-card rounded-2xl shadow-2xl border border-border py-4 z-50 animate-in fade-in slide-in-from-top-3 duration-300">
+                            <div className="px-6 pb-3 border-b border-border/50 flex items-center justify-between">
+                                <h3 className="font-bold text-foreground">التنبيهات</h3>
                                 <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">3 جديدة</span>
                             </div>
                             <div className="max-h-[300px] overflow-y-auto">
                                 {[
-                                    { title: "طلب جديد", desc: "تم تسجيل طلب جديد برقم #INV-102", time: "منذ دقيقتين", color: "text-blue-600 bg-blue-50" },
-                                    { title: "نقص في المخزون", desc: "سجادة صلاة ملكي اقتربت من الانتهاء", time: "منذ ساعة", color: "text-red-600 bg-red-50" },
-                                    { title: "تهيئة النظام", desc: "تم تحديث صلاحيات المستخدمين بنجاح", time: "منذ 3 ساعات", color: "text-green-600 bg-green-50" },
+                                    { title: "طلب جديد", desc: "تم تسجيل طلب جديد برقم #INV-102", time: "منذ دقيقتين", color: "text-blue-600 bg-blue-50 dark:bg-blue-900/20 dark:text-blue-400" },
+                                    { title: "نقص في المخزون", desc: "سجادة صلاة ملكي اقتربت من الانتهاء", time: "منذ ساعة", color: "text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400" },
+                                    { title: "تهيئة النظام", desc: "تم تحديث صلاحيات المستخدمين بنجاح", time: "منذ 3 ساعات", color: "text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400" },
                                 ].map((item, i) => (
-                                    <div key={i} className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50/50 last:border-0 text-right">
+                                    <div key={i} className="px-6 py-4 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/50 last:border-0 text-right">
                                         <div className="flex gap-3">
                                             <div className={cn("w-10 h-10 rounded-xl shrink-0 flex items-center justify-center font-bold text-xs", item.color)}>
                                                 {item.title[0]}
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-sm font-bold text-gray-800">{item.title}</p>
-                                                <p className="text-xs text-gray-500 line-clamp-1">{item.desc}</p>
-                                                <p className="text-[10px] text-gray-400 mt-1">{item.time}</p>
+                                                <p className="text-sm font-bold text-foreground">{item.title}</p>
+                                                <p className="text-xs text-muted-foreground line-clamp-1">{item.desc}</p>
+                                                <p className="text-[10px] text-muted-foreground/70 mt-1">{item.time}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -167,16 +212,16 @@ export function Header() {
                     )}
                 </div>
 
-                <div className="h-8 w-px bg-gray-200 mx-1 hidden sm:block"></div>
+                <div className="h-8 w-px bg-border mx-1 hidden sm:block"></div>
 
                 <div className="flex items-center gap-3 p-1 rounded-xl">
                     <div className="text-right hidden md:block leading-tight">
-                        <p className="text-sm font-bold text-gray-800">{user?.name || "جاري التحميل..."}</p>
+                        <p className="text-sm font-bold text-foreground">{user?.name || "جاري التحميل..."}</p>
                         <p className="text-xs text-secondary font-medium">
                             {user?.role === 'admin' ? 'مدير النظام' : user?.role === 'manager' ? 'مدير المعرض' : 'كاشير'}
                         </p>
                     </div>
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#5D4037] flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20 ring-2 ring-white overflow-hidden">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-[#5D4037] flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20 ring-2 ring-card overflow-hidden">
                         {user?.name ? getInitials(user.name) : <UserIcon className="w-5 h-5" />}
                     </div>
                 </div>

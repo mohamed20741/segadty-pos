@@ -3,36 +3,100 @@
 @theme {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
   
-  --color-primary: #8B4513;
-  --color-primary-foreground: #FFFFFF;
-  
-  --color-secondary: #D4AF37;
-  --color-secondary-foreground: #000000;
-  
-  --color-accent: #006400;
-  --color-accent-foreground: #FFFFFF;
-  
-  --color-surface: #F5F5DC;
-  --color-surface-foreground: #3E2723;
-  
-  --color-muted: #f3f4f6;
-  --color-muted-foreground: #6b7280;
-
   --font-sans: var(--font-cairo), ui-sans-serif, system-ui, sans-serif;
 }
 
 :root {
   --background: #FAF9F6;
   --foreground: #3E2723;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #8B4513;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --destructive: #ef4444;
+  --destructive-foreground: #f9fafb;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #8B4513;
+  --surface: #F5F5DC;
+  --surface-foreground: #3E2723;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #111827;
+  --card-foreground: #f9fafb;
+  --popover: #111827;
+  --popover-foreground: #f9fafb;
+  --primary: #8B4513;
+  --primary-foreground: #ffffff;
+  --secondary: #374151;
+  --secondary-foreground: #f9fafb;
+  --muted: #374151;
+  --muted-foreground: #9ca3af;
+  --accent: #374151;
+  --accent-foreground: #f9fafb;
+  --destructive: #dc2626;
+  --destructive-foreground: #f9fafb;
+  --border: #374151;
+  --input: #374151;
+  --ring: #8B4513;
+  --surface: #1f2937;
+  --surface-foreground: #f9fafb;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1a1a1a;
-    --foreground: #F5F5DC;
-    --color-surface: #2C2C2C;
-    --color-surface-foreground: #F5F5DC;
+    --background: #0a0a0a;
+    --foreground: #fafafa;
+    --card: #111827;
+    --card-foreground: #f9fafb;
+    --popover: #111827;
+    --popover-foreground: #f9fafb;
+    --primary: #8B4513;
+    --primary-foreground: #ffffff;
+    --secondary: #374151;
+    --secondary-foreground: #f9fafb;
+    --muted: #374151;
+    --muted-foreground: #9ca3af;
+    --accent: #374151;
+    --accent-foreground: #f9fafb;
+    --destructive: #dc2626;
+    --destructive-foreground: #f9fafb;
+    --border: #374151;
+    --input: #374151;
+    --ring: #8B4513;
+    --surface: #1f2937;
+    --surface-foreground: #f9fafb;
   }
 }
 
@@ -41,6 +105,7 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Glassmorphism Utilities */
@@ -56,4 +121,31 @@ body {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Custom Scrollbar for Dark Mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--muted-foreground);
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+}
+
+/* Smooth transitions for all theme changes */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
 }
